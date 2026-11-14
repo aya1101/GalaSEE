@@ -4,6 +4,7 @@ node_modules/
 .vercel/
 out/
 coverage/
+.cache/
 *.log
 .env
 .env.*
@@ -17,3 +18,32 @@ venv/
 dist/
 build/
 .DS_Store
+
+# Local agent/dev session state
+.history/
+.gstack/
+.superpowers/
+.codex/
+
+# Python tooling and test reports
+.mypy_cache/
+.ruff_cache/
+.pyre/
+.hypothesis/
+.coverage
+.coverage.*
+htmlcov/
+*.egg-info/
+
+# Local runtime files
+*.pid
+*.pid.lock
+*.sqlite3
+*.db
+
+# Downloaded Earthdata/raster artifacts
+*.h5
+*.hdf5
+*.tif
+*.tiff
+*.vrt

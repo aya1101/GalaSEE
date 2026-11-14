@@ -1,2 +1,9 @@
 fastapi
 uvicorn[standard]
+httpx
+python-dotenv
+numpy
+rasterio
+shapely
+pyproj
+pillow

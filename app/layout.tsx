@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "TideAware",
-  description: "Evidence-aware coastal intelligence for mangrove protection.",
+  description: "Bản đồ giám sát rừng ngập mặn và phát hiện bất thường.",
 };
 
 export default function RootLayout({
@@ -12,7 +12,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="vi">
       <body>{children}</body>
     </html>
   );

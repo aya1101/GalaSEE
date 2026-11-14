@@ -21,19 +21,23 @@ Copy-Item .env.example .env.local
 npm run dev
 ```
 
-Open `http://localhost:3000`.
+`npm run dev` starts both the Next.js web app and the FastAPI Earthdata proxy. Open `http://localhost:3000`.
 
-### API
-
-```bash
-cd api
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-uvicorn main:app --reload --port 8000
-```
+For a standalone API process, run `python -m uvicorn api.main:app --port 8000` from the repository root.
 
 The API health check is available at `http://localhost:8000/health`.
+
+### Earthdata streaming
+
+The browser never receives the Earthdata token. Configure the FastAPI service with a protected HTTPS NASA/DAAC URL that returns GeoJSON features using the TideAware properties (`id`, `kind`, `title`, and optional detail fields):
+
+```text
+EARTHDATA_TOKEN=your-earthdata-bearer-token
+EARTHDATA_DATA_URL=https://your-nasa-data-endpoint.example/regions.geojson
+EARTHDATA_ALLOWED_HOSTS=
+```
+
+The web app calls `/api/v1/earthdata/geojson`; FastAPI adds `Authorization: Bearer ...` and streams the response. If `EARTHDATA_API_URL` is not configured, the map uses clearly labeled demo GeoJSON so the UI remains usable during setup. NISAR HDF5 scenes should be converted to a small GeoJSON/COG-derived layer before serving to the map; streaming a multi-gigabyte HDF5 file directly into the browser is not suitable for map interaction.
 
 ## Supabase setup
 

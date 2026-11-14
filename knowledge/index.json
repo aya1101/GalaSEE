@@ -1,0 +1,38 @@
+{
+  "version": "knowledge-476796cdf3c0f942",
+  "chunks": [
+    {
+      "claimId": "gcov-hhhh",
+      "statement": "HHHH là thành phần covariance đồng phân cực của sản phẩm GCOV; giá trị raster là backscatter power và có thể được biểu diễn ở dB.",
+      "sourceDocumentId": "asf-gcov-guide",
+      "sourceAnchor": "data-layers/geocoded-polarimetric-covariance-terms",
+      "allowedAnswerTypes": [
+        "explanation",
+        "tooltip"
+      ],
+      "reviewStatus": "approved"
+    },
+    {
+      "claimId": "gcov-hvhv",
+      "statement": "HVHV là thành phần covariance phân cực chéo của sản phẩm GCOV; giá trị raster là backscatter power và có thể được biểu diễn ở dB.",
+      "sourceDocumentId": "asf-gcov-guide",
+      "sourceAnchor": "data-layers/geocoded-polarimetric-covariance-terms",
+      "allowedAnswerTypes": [
+        "explanation",
+        "tooltip"
+      ],
+      "reviewStatus": "approved"
+    },
+    {
+      "claimId": "candidate-change-policy",
+      "statement": "Candidate change chỉ là vùng thay đổi ứng viên cần kiểm chứng và không đồng nghĩa mất rừng, phá rừng hoặc vi phạm pháp luật.",
+      "sourceDocumentId": "asf-gcov-guide",
+      "sourceAnchor": "tideaware/policy/candidate-change",
+      "allowedAnswerTypes": [
+        "policy",
+        "explanation"
+      ],
+      "reviewStatus": "approved"
+    }
+  ]
+}
