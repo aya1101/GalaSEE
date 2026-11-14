@@ -34,6 +34,12 @@ describe("CopilotPanel", () => {
     expect(screen.queryByText("GalaSEE Assistant")).not.toBeInTheDocument();
   });
 
+  it("accepts the explorer mapContext adapter contract", () => {
+    render(<CopilotPanel open mapContext={context} onClose={vi.fn()} onUiAction={vi.fn()} />);
+
+    expect(screen.getByText("GalaSEE Assistant")).toBeInTheDocument();
+  });
+
   it("renders streamed tokens, citations, and safe actions", async () => {
     const onAction = vi.fn();
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response([

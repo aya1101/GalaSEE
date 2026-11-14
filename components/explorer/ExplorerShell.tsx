@@ -8,6 +8,11 @@ import type { Feature, FeatureCollection, Geometry } from "geojson";
 import { apiBaseUrl } from "@/lib/config";
 import { demoGeoJson, studyAreaGeoJson, type RegionProperties } from "@/lib/geojson";
 import { CopilotPanel } from "@/components/copilot/CopilotPanel";
+import { ExplorerSidebar } from "@/components/explorer/ExplorerSidebar";
+import { ExplorerMap } from "@/components/explorer/ExplorerMap";
+import { LayerPanel } from "@/components/explorer/LayerPanel";
+import { SceneInspector } from "@/components/explorer/SceneInspector";
+import { TimelineControl } from "@/components/explorer/TimelineControl";
 import chatbotLogo from "@/chatbot-logo.png";
 import type { CopilotAnalyticsSnapshot, CopilotContext, UiAction } from "@/components/copilot/copilot-types";
 
@@ -894,19 +899,43 @@ export function ExplorerShell({ region }: ExplorerShellProps) {
         className={`workspace ${isResizing ? "is-resizing" : ""}`}
         style={{ "--sidebar-width": `${sidebarWidth}px`, "--inspector-width": `${inspectorWidth}px` } as CSSProperties}
       >
-        <Sidebar activeSection={activeSection} onSelect={setActiveSection} onResizeStart={startResize} />
-        <section className="map-workspace">
+        <ExplorerSidebar
+          scene={selectedFeature?.properties ? {
+            id: selectedFeature.properties.id,
+            title: selectedFeature.properties.title,
+            dataMode: dataTruth.catalogMode === "earthdata" && dataTruth.assetMode === "cached" ? "cached" : dataTruth.catalogMode,
+            assetMode: dataTruth.assetMode,
+            dataStatus: dataTruth.dataStatus,
+          } : undefined}
+          layerState={layers}
+          onLayerChange={(layer) => toggleLayer(layer as keyof LayerState)}
+          activeSection={activeSection}
+          onSectionChange={setActiveSection}
+          onResizeStart={startResize}
+        />
+        <ExplorerMap
+          mapContext={{
+            region,
+            sceneId: selectedFeature?.properties.id ?? null,
+            dataMode: dataTruth.catalogMode === "earthdata" && dataTruth.assetMode === "cached" ? "cached" : dataTruth.catalogMode,
+          }}
+          onPixelSelect={() => setPixelInspection(null)}
+        >
           <div ref={mapNode} className="map-canvas" aria-label="Bản đồ giám sát rừng ngập mặn" />
           <MapHeader />
-          <SceneTimeline scenes={studyScenes} selectedId={selectedId} comparisonId={comparisonSceneId} comparison={comparison} playing={timelinePlaying} onSelect={(id) => { setSelectedId(id); setComparisonSceneSelection(undefined); }} onComparisonSelect={setComparisonSceneSelection} onRunComparison={runComparison} onTogglePlay={() => setTimelinePlaying((value) => !value)} />
-          {activeSection === "map" ? <LayerLegend layers={layers} radarBand={radarBand} rasterStyle={rasterStyle} status={radarLayerStatus} onToggle={toggleLayer} onRadarBandChange={setRadarBand} onRasterStyleChange={setRasterStyle} /> : <DataLayersPanel layers={layers} radarBand={radarBand} status={radarLayerStatus} onToggle={toggleLayer} onRadarBandChange={setRadarBand} onClose={() => setActiveSection("map")} />}
+          <TimelineControl selectedSceneId={selectedId}>
+            <SceneTimeline scenes={studyScenes} selectedId={selectedId} comparisonId={comparisonSceneId} comparison={comparison} playing={timelinePlaying} onSelect={(id) => { setSelectedId(id); setComparisonSceneSelection(undefined); }} onComparisonSelect={setComparisonSceneSelection} onRunComparison={runComparison} onTogglePlay={() => setTimelinePlaying((value) => !value)} />
+          </TimelineControl>
+          <LayerPanel layerState={layers} onLayerChange={(layer) => toggleLayer(layer as keyof LayerState)}>
+            {activeSection === "map" ? <LayerLegend layers={layers} radarBand={radarBand} rasterStyle={rasterStyle} status={radarLayerStatus} onToggle={toggleLayer} onRadarBandChange={setRadarBand} onRasterStyleChange={setRasterStyle} /> : <DataLayersPanel layers={layers} radarBand={radarBand} status={radarLayerStatus} onToggle={toggleLayer} onRadarBandChange={setRadarBand} onClose={() => setActiveSection("map")} />}
+          </LayerPanel>
           <ScaleBar />
-        </section>
+        </ExplorerMap>
         <Inspector feature={selectedFeature} radarMetric={radarMetric} pixelInspection={pixelInspection} regionStats={regionStats} comparison={comparison} open={mobilePanelOpen} onClose={() => setMobilePanelOpen(false)} onResizeStart={startResize} />
         <button className="mobile-panel-trigger" onClick={() => setMobilePanelOpen(true)}><Icon name="menu" /> Chi tiết khu vực</button>
         <div className="copilot-dock" style={copilotDockPosition ? { left: copilotDockPosition.left, top: copilotDockPosition.top, right: "auto", bottom: "auto" } : undefined}>
           <button type="button" className="copilot-bubble" aria-label="Mở GalaSEE Assistant" onPointerDown={startCopilotDrag} onClick={() => setCopilotOpen(true)}><Image src={chatbotLogo} alt="" aria-hidden="true" priority /></button>
-          <CopilotPanel open={copilotOpen} context={copilotContext} onPanelDragStart={startCopilotDrag} onClose={() => setCopilotOpen(false)} onAction={handleCopilotAction} onUndo={handleUndo} canUndo={undoStack.length > 0} />
+          <CopilotPanel open={copilotOpen} mapContext={copilotContext} onPanelDragStart={startCopilotDrag} onClose={() => setCopilotOpen(false)} onUiAction={handleCopilotAction} onUndo={handleUndo} canUndo={undoStack.length > 0} />
         </div>
       </div>
     </main>
@@ -937,22 +966,6 @@ function Topbar({ loading, dataTruth }: { loading: boolean; dataTruth: DataTruth
         <button className="team-button"><span className="avatar">BT</span><span>Đội bảo tồn</span><span className="caret">⌄</span></button>
       </div>
     </header>
-  );
-}
-
-function Sidebar({ activeSection, onSelect, onResizeStart }: { activeSection: SidebarSection; onSelect: (section: SidebarSection) => void; onResizeStart: (side: "sidebar" | "inspector", event: ReactPointerEvent<HTMLButtonElement>) => void }) {
-  return (
-    <aside className="sidebar">
-      <div className="side-nav">
-        <button className={`nav-item ${activeSection === "map" ? "active" : ""}`} onClick={() => onSelect("map")}><Icon name="map" /><span>Bản đồ</span></button>
-        <button className={`nav-item ${activeSection === "layers" ? "active" : ""}`} onClick={() => onSelect("layers")}><Icon name="layers" /><span>Lớp dữ liệu</span></button>
-        <button className="nav-item"><Icon name="anomaly" /><span>Bất thường</span><span className="nav-count">08</span></button>
-        <button className="nav-item"><Icon name="focus" /><span>Khu vực nghiên cứu</span></button>
-        <button className="nav-item"><Icon name="download" /><span>Xuất dữ liệu</span></button>
-      </div>
-      <div className="side-bottom"><button className="nav-item"><Icon name="settings" /><span>Cài đặt</span></button></div>
-      <PanelResizeHandle side="sidebar" onPointerDown={(event) => onResizeStart("sidebar", event)} />
-    </aside>
   );
 }
 
@@ -1150,14 +1163,16 @@ function ScaleBar() {
 
 function Inspector({ feature, radarMetric, pixelInspection, regionStats, comparison, open, onClose, onResizeStart }: { feature?: RegionFeature; radarMetric: RadarMetricState; pixelInspection: PixelInspection | null; regionStats: RegionStatsState; comparison: ComparisonState; open: boolean; onClose: () => void; onResizeStart: (side: "sidebar" | "inspector", event: ReactPointerEvent<HTMLButtonElement>) => void }) {
   return (
-    <aside className={`inspector ${open ? "mobile-open" : ""}`}>
-      <PanelResizeHandle side="inspector" onPointerDown={(event) => onResizeStart("inspector", event)} />
-      <div className="inspector-head">
-        <div><span className="panel-kicker">KHU VỰC ĐANG CHỌN</span><h1>Chi tiết khu vực</h1></div>
-        <button className="icon-button close-panel" aria-label="Đóng chi tiết" onClick={onClose}><Icon name="close" /></button>
-      </div>
+    <SceneInspector
+      scene={feature ? { id: feature.properties.id, title: sceneDisplayTitle(feature.properties) } : undefined}
+      open={open}
+      onClose={onClose}
+      onResizeStart={(side, event) => onResizeStart(side, event)}
+      resizeHandle={<PanelResizeHandle side="inspector" onPointerDown={(event) => onResizeStart("inspector", event)} />}
+      closeButton={<button className="icon-button close-panel" aria-label="Đóng chi tiết" onClick={onClose}><Icon name="close" /></button>}
+    >
       {feature ? <RegionDetails feature={feature} radarMetric={radarMetric} pixelInspection={pixelInspection} regionStats={regionStats} comparison={comparison} /> : <div className="empty-detail">Chọn một vùng trên bản đồ để xem thông tin.</div>}
-    </aside>
+    </SceneInspector>
   );
 }
 

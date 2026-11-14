@@ -5,7 +5,10 @@ import Image from "next/image";
 import type { CopilotCitation, CopilotContext, CopilotMessage, UiAction } from "./copilot-types";
 import chatbotLogo from "@/chatbot-logo.png";
 
-type Props = { open: boolean; context: CopilotContext; onClose: () => void; onAction: (action: UiAction) => void; onUndo?: () => void; canUndo?: boolean; onPanelDragStart?: (event: ReactPointerEvent<HTMLElement>) => void };
+type CommonProps = { open: boolean; onClose: () => void; onUndo?: () => void; canUndo?: boolean; onPanelDragStart?: (event: ReactPointerEvent<HTMLElement>) => void };
+type LegacyProps = { context: CopilotContext; onAction: (action: UiAction) => void };
+type AdapterProps = { mapContext: CopilotContext; onUiAction: (action: UiAction) => void };
+export type CopilotPanelProps = CommonProps & (LegacyProps | AdapterProps);
 
 function endpoint() {
   return "/api/copilot/chat";
@@ -175,14 +178,17 @@ const COMMON_QUESTIONS = [
   "Mở thống kê khu vực",
 ];
 
-export function CopilotPanel({ open, context, onClose, onAction, onUndo, canUndo = false, onPanelDragStart }: Props) {
+export function CopilotPanel(props: CopilotPanelProps) {
+  const { open, onClose, onUndo, canUndo = false, onPanelDragStart } = props;
+  const mapContext = "mapContext" in props ? props.mapContext : props.context;
+  const onUiAction = "onUiAction" in props ? props.onUiAction : props.onAction;
   const [messages, setMessages] = useState<CopilotMessage[]>([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => () => abortRef.current?.abort(), []);
-  useEffect(() => { abortRef.current?.abort(); setSending(false); }, [context.contextVersion]);
+  useEffect(() => { abortRef.current?.abort(); setSending(false); }, [mapContext.contextVersion]);
 
   if (!open) return null;
 
@@ -197,7 +203,7 @@ export function CopilotPanel({ open, context, onClose, onAction, onUndo, canUndo
     const controller = new AbortController();
     abortRef.current = controller;
     try {
-      const response = await fetch(endpoint(), { method: "POST", headers: { "Content-Type": "application/json", Accept: "text/event-stream" }, body: JSON.stringify({ conversationId: "browser-session", message, mapContext: context }), signal: controller.signal });
+      const response = await fetch(endpoint(), { method: "POST", headers: { "Content-Type": "application/json", Accept: "text/event-stream" }, body: JSON.stringify({ conversationId: "browser-session", message, mapContext }), signal: controller.signal });
       if (!response.ok || !response.body) throw new Error(`Copilot request failed: ${response.status}`);
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
@@ -221,8 +227,8 @@ export function CopilotPanel({ open, context, onClose, onAction, onUndo, canUndo
             return alreadyShown ? item : { ...item, citations: [...citations, citation] };
           }));
           if (parsed.event === "action") {
-            const action = safeAction(parsed.data, context.contextVersion);
-            if (action) onAction(action);
+            const action = safeAction(parsed.data, mapContext.contextVersion);
+            if (action) onUiAction(action);
           }
           if (parsed.event === "done") {
             const actions = Array.isArray(parsed.data.actions) ? parsed.data.actions as unknown as UiAction[] : [];
