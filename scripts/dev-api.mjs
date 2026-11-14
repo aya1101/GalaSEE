@@ -4,6 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawn } from "node:child_process";
+import { buildApiServerArgs } from "./dev-api-options.mjs";
 
 const apiHealthUrl = "http://127.0.0.1:8000/health";
 const apiPort = 8000;
@@ -56,13 +57,8 @@ const python = fs.existsSync(localPython)
   : (process.platform === "win32" ? "python" : "python3");
 
 console.log(`[api] Using Python: ${python}`);
-// Keep the single `npm run dev` workflow, but let Uvicorn restart its worker
-// whenever Python code changes. Next.js already watches the frontend files.
 const api = spawn(python, [
-  "-m", "uvicorn", "api.main:app",
-  "--port", "8000",
-  "--reload",
-  "--reload-dir", path.join(projectRoot, "api"),
+  ...buildApiServerArgs(),
 ], { stdio: "inherit" });
 
 const stopApi = () => {
