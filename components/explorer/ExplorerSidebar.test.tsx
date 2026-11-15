@@ -32,26 +32,38 @@ describe("ExplorerSidebar", () => {
 
     expect(screen.getByText("Map")).toBeInTheDocument();
     expect(screen.getByText("Data layers")).toBeInTheDocument();
-    expect(screen.getByText("Study area")).toBeInTheDocument();
+    expect(screen.queryByText("Study area")).not.toBeInTheDocument();
     expect(screen.queryByText("Earthdata live")).not.toBeInTheDocument();
   });
 
-  it("returns to the scene inspector from the study area tab", () => {
-    const onSectionChange = vi.fn();
-    const onStudyAreaFocus = vi.fn();
+  it("keeps map as the only area-navigation tab", () => {
     render(
       <ExplorerSidebar
         layerState={{}}
         onLayerChange={vi.fn()}
         activeSection="layers"
-        onSectionChange={onSectionChange}
-        onStudyAreaFocus={onStudyAreaFocus}
+        onSectionChange={vi.fn()}
         onResizeStart={vi.fn()}
       />,
     );
 
-    fireEvent.click(screen.getByText("Khu vực nghiên cứu"));
-    expect(onSectionChange).toHaveBeenCalledWith("map");
-    expect(onStudyAreaFocus).toHaveBeenCalledOnce();
+    expect(screen.getByText("Bản đồ")).toBeInTheDocument();
+    expect(screen.queryByText("Khu vực nghiên cứu")).not.toBeInTheDocument();
+  });
+
+  it("opens the tide-aware engine as its own analysis tab", () => {
+    const onSectionChange = vi.fn();
+    render(
+      <ExplorerSidebar
+        layerState={{}}
+        onLayerChange={vi.fn()}
+        activeSection="map"
+        onSectionChange={onSectionChange}
+        onResizeStart={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByText("Theo triều"));
+    expect(onSectionChange).toHaveBeenCalledWith("engine");
   });
 });

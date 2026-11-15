@@ -1,7 +1,9 @@
+import { serverApiUrl } from "@/lib/server-api";
+
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
-  const apiUrl = process.env.EARTHDATA_API_URL?.replace(/\/$/, "");
+  const apiUrl = serverApiUrl();
   if (!apiUrl) return Response.json({ error: "Copilot backend is not configured" }, { status: 503 });
   try {
     const upstream = await fetch(`${apiUrl}/api/v1/copilot/chat`, {

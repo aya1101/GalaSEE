@@ -1,0 +1,135 @@
+{
+  "run_utc": "2026-11-15T03:24:23.653300+00:00",
+  "CONFIG": {
+    "WORK": "/content/tideaware",
+    "MULTILOOK": 10,
+    "KEEP_RAW": false,
+    "Z_THR": -3.0,
+    "Z_POS": 3.0,
+    "MIN_DB_DROP": 1.5,
+    "CUSUM_K": 0.5,
+    "CUSUM_H": 4.0,
+    "MIN_PATCH": 3,
+    "SEED": 42,
+    "USE_DRIVE_CACHE": true,
+    "BBOX_LONLAT": [
+      106.7603,
+      10.3686,
+      107.0276,
+      10.6807
+    ],
+    "EPSG": 32648
+  },
+  "packages": [
+    {
+      "name": "numpy",
+      "version": "2.4.6",
+      "role": "arrays",
+      "citation": "",
+      "license": "see THIRD_PARTY.md"
+    },
+    {
+      "name": "h5py",
+      "version": "3.14.0",
+      "role": "NISAR HDF5",
+      "citation": "",
+      "license": "see THIRD_PARTY.md"
+    },
+    {
+      "name": "rasterio",
+      "version": "1.5.2",
+      "role": "GeoTIFF",
+      "citation": "",
+      "license": "see THIRD_PARTY.md"
+    },
+    {
+      "name": "matplotlib",
+      "version": "3.10.0",
+      "role": "figures",
+      "citation": "",
+      "license": "see THIRD_PARTY.md"
+    },
+    {
+      "name": "scipy",
+      "version": "1.16.3",
+      "role": "ndimage/label/stats",
+      "citation": "",
+      "license": "see THIRD_PARTY.md"
+    },
+    {
+      "name": "pandas",
+      "version": "2.2.3",
+      "role": "tables/tide",
+      "citation": "",
+      "license": "see THIRD_PARTY.md"
+    },
+    {
+      "name": "scikit-image",
+      "version": "0.25.2",
+      "role": "Otsu mask",
+      "citation": "",
+      "license": "see THIRD_PARTY.md"
+    },
+    {
+      "name": "pyproj",
+      "version": "3.8.0",
+      "role": "CRS/bbox",
+      "citation": "",
+      "license": "see THIRD_PARTY.md"
+    },
+    {
+      "name": "requests",
+      "version": "2.32.4",
+      "role": "download",
+      "citation": "",
+      "license": "see THIRD_PARTY.md"
+    },
+    {
+      "name": "tqdm",
+      "version": "4.67.3",
+      "role": "progress",
+      "citation": "",
+      "license": "see THIRD_PARTY.md"
+    },
+    {
+      "name": "torch",
+      "version": "2.14.1+cu130",
+      "role": "L-TAE train",
+      "citation": "Garnot & Landrieu 2020 (architecture)",
+      "license": "see THIRD_PARTY.md"
+    },
+    {
+      "name": "nrt",
+      "version": "0.3.0",
+      "role": "EWMA/CuSum trial",
+      "citation": "Dutrieux & Viehweger JOSS 2024",
+      "license": "EUPL-1.2"
+    }
+  ],
+  "module_status": {
+    "third_party": "DONE",
+    "download": "DONE",
+    "crop": "DONE",
+    "tide": "DONE",
+    "layer1_viz": "DONE",
+    "tide_ols": "DONE",
+    "robust_z": "DONE",
+    "layer3": "DONE",
+    "layer4": "DONE",
+    "uncertainty": "DONE",
+    "validation": "DONE",
+    "figures": "DONE",
+    "export": "DONE"
+  },
+  "validation_status": "NOT VALIDATED",
+  "tide_status": "PARTIAL",
+  "lattice_status": "LATTICE_ALIGNED",
+  "nrt_status": {
+    "047": "NRT: NOT APPLICABLE (n_ref=4)",
+    "155": "NRT: NOT APPLICABLE (n_ref=4)"
+  },
+  "veg_mask_status": {
+    "047": "PROVISIONAL_UNVALIDATED_OTSU",
+    "155": "PROVISIONAL_UNVALIDATED_OTSU"
+  }
+}

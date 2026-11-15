@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 import { demoGeoJson } from "@/lib/geojson";
+import { serverApiUrl } from "@/lib/server-api";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const apiUrl = process.env.EARTHDATA_API_URL?.replace(/\/$/, "");
+  const apiUrl = serverApiUrl();
   if (!apiUrl) {
     return NextResponse.json(demoGeoJson, {
       headers: {

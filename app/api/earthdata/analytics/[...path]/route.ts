@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { apiBaseUrl } from "@/lib/config";
+import { serverApiUrl } from "@/lib/server-api";
 
 type RouteContext = { params: Promise<{ path: string[] }> };
 
 async function forward(request: NextRequest, context: RouteContext) {
   const { path } = await context.params;
-  const targetRoot = apiBaseUrl || "http://127.0.0.1:8000";
+  const targetRoot = serverApiUrl() || "http://127.0.0.1:8000";
   const target = `${targetRoot}/api/v1/${path.map((part) => encodeURIComponent(part)).join("/")}${request.nextUrl.search}`;
   const headers = new Headers();
   const contentType = request.headers.get("content-type");

@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
+import { serverApiUrl } from "@/lib/server-api";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   const target = new URL(request.url).searchParams.get("url");
   if (!target) return NextResponse.json({ error: "Missing KML URL" }, { status: 400 });
-  const apiUrl = process.env.EARTHDATA_API_URL?.replace(/\/$/, "");
+  const apiUrl = serverApiUrl();
   if (!apiUrl) return NextResponse.json({ error: "Earthdata API is not configured" }, { status: 503 });
   try {
     const response = await fetch(`${apiUrl}/api/v1/earthdata/kml?url=${encodeURIComponent(target)}`, { cache: "no-store" });

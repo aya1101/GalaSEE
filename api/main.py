@@ -25,6 +25,7 @@ from .aoi_registry import AoiRegistry
 from .copilot import CopilotRequest, CopilotService
 from .copilot_tools import ToolContext
 from .default_aoi import DEFAULT_AOI_GEOMETRY, DEFAULT_AOI_ID
+from .tideaware.routes import router as tideaware_router
 
 
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
@@ -69,7 +70,6 @@ app.add_middleware(
     allow_headers=["Authorization", "Content-Type"],
     expose_headers=["X-TideAware-Data-Source", "X-TideAware-Catalog-Mode", "X-TideAware-Asset-Mode", "X-TideAware-Data-Status"],
 )
-
 
 @app.get("/health")
 def health() -> dict[str, str]:
@@ -1381,3 +1381,5 @@ COPILOT_SERVICE.tools.register("search_scenes", _copilot_search_scenes)
 COPILOT_SERVICE.tools.register("get_radar_profile", _copilot_profile)
 COPILOT_SERVICE.tools.register("get_region_stats", _copilot_region_stats)
 COPILOT_SERVICE.tools.register("get_pixel_values", _copilot_pixel)
+
+app.include_router(tideaware_router)

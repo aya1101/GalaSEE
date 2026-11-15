@@ -1,0 +1,45 @@
+id,file,input,status
+F05,F05_median_HH_T047.png,F05 Reference median HH T047,OK
+F06,F06_sigma_HH_T047.png,F06 sigma_pix HH T047,OK
+F07,F07_Z_HH_T047.png,F07 Robust Z HH T047,OK
+F08,F08_label_HH_T047.png,F08 Anomaly class HH T047,OK
+F09,F09_temporal_HH_T047.png,F09 Temporal evidence HH T047,OK
+F10,F10_uncertainty_HH_T047.png,F10 Uncertainty HH T047,OK
+F14,F14_CUSUM_HH_T047.png,F14 CUSUM S HH T047,OK
+F16,F16_reactiv_T047.png,stack,OK
+F04,F04_orig_corr_T047.png,HH,OK
+F17,F17_loss_T047.png,/content/tideaware/layer3/train_log_track_047.csv,OK
+F05,F05_median_HH_T155.png,F05 Reference median HH T155,OK
+F06,F06_sigma_HH_T155.png,F06 sigma_pix HH T155,OK
+F07,F07_Z_HH_T155.png,F07 Robust Z HH T155,OK
+F08,F08_label_HH_T155.png,F08 Anomaly class HH T155,OK
+F09,F09_temporal_HH_T155.png,F09 Temporal evidence HH T155,OK
+F10,F10_uncertainty_HH_T155.png,F10 Uncertainty HH T155,OK
+F14,F14_CUSUM_HH_T155.png,F14 CUSUM S HH T155,OK
+F16,F16_reactiv_T155.png,stack,OK
+F04,F04_orig_corr_T155.png,HH,OK
+F17,F17_loss_T155.png,/content/tideaware/layer3/train_log_track_155.csv,OK
+F12,F12_tide_vs_date.png,metadata.csv,OK
+F13,F13_sensitivity.png,sensitivity.csv,OK
+F05,F05_median_HH_T047.png,F05 Reference median HH T047,OK
+F06,F06_sigma_HH_T047.png,F06 sigma_pix HH T047,OK
+F07,F07_Z_HH_T047.png,F07 Robust Z HH T047,OK
+F08,F08_label_HH_T047.png,F08 Anomaly class HH T047,OK
+F09,F09_temporal_HH_T047.png,F09 Temporal evidence HH T047,OK
+F10,F10_uncertainty_HH_T047.png,F10 Uncertainty HH T047,OK
+F14,F14_CUSUM_HH_T047.png,F14 CUSUM S HH T047,OK
+F16,F16_reactiv_T047.png,stack,OK
+F04,F04_orig_corr_T047.png,HH,OK
+F17,F17_loss_T047.png,/content/tideaware/layer3/047/train_log.csv,OK
+F05,F05_median_HH_T155.png,F05 Reference median HH T155,OK
+F06,F06_sigma_HH_T155.png,F06 sigma_pix HH T155,OK
+F07,F07_Z_HH_T155.png,F07 Robust Z HH T155,OK
+F08,F08_label_HH_T155.png,F08 Anomaly class HH T155,OK
+F09,F09_temporal_HH_T155.png,F09 Temporal evidence HH T155,OK
+F10,F10_uncertainty_HH_T155.png,F10 Uncertainty HH T155,OK
+F14,F14_CUSUM_HH_T155.png,F14 CUSUM S HH T155,OK
+F16,F16_reactiv_T155.png,stack,OK
+F04,F04_orig_corr_T155.png,HH,OK
+F17,,/content/tideaware/layer3/155/train_log.csv,SKIPPED - INPUT UNAVAILABLE
+F12,F12_tide_vs_date.png,metadata.csv,OK
+F13,F13_sensitivity.png,sensitivity.csv,OK

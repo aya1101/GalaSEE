@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
+import { serverApiUrl } from "@/lib/server-api";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(_request: Request, { params }: { params: Promise<{ previewId: string }> }) {
   const { previewId } = await params;
-  const apiUrl = process.env.EARTHDATA_API_URL?.replace(/\/$/, "");
+  const apiUrl = serverApiUrl();
   if (!apiUrl) return NextResponse.json({ error: "Earthdata API is not configured" }, { status: 503 });
   try {
     const response = await fetch(`${apiUrl}/api/v1/earthdata/gcov/preview/file/${encodeURIComponent(previewId)}`, { cache: "no-store" });

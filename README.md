@@ -90,10 +90,10 @@ If port `8000` already has a healthy TideAware API, the development launcher reu
 Expose the Next.js port, not the API port:
 
 ```bash
-ngrok http 3000
+ngrok http 127.0.0.1:3000
 ```
 
-The Next.js config allows `*.ngrok-free.dev` and `*.ngrok.io` for development-only assets. This is required by Next.js 16 so client-only features such as the 3D globe can hydrate through the tunnel. Production builds do not use this dev-origin allowlist.
+Use the explicit IPv4 target above instead of `ngrok http 3000`; on Windows, `localhost` may resolve to `[::1]` while the dev server is bound to IPv4. The Next.js config allows `*.ngrok-free.dev` and `*.ngrok.io` for development-only assets. This is required by Next.js 16 so client-only features such as the 3D globe can hydrate through the tunnel. Production builds do not use this dev-origin allowlist.
 
 ## Environment configuration
 

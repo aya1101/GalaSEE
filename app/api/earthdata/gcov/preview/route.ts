@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { serverApiUrl } from "@/lib/server-api";
 
 export const dynamic = "force-dynamic";
 
@@ -6,7 +7,7 @@ export async function GET(request: Request) {
   const params = new URL(request.url).searchParams;
   const scene = params.get("scene");
   if (!scene) return NextResponse.json({ error: "Missing scene" }, { status: 400 });
-  const apiUrl = process.env.EARTHDATA_API_URL?.replace(/\/$/, "");
+  const apiUrl = serverApiUrl();
   if (!apiUrl) return NextResponse.json({ error: "Earthdata API is not configured" }, { status: 503 });
   const query = new URLSearchParams({
     scene,

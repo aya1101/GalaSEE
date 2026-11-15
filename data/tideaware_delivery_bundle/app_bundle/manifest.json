@@ -1,0 +1,219 @@
+{
+  "project": "TideAware",
+  "scenes": [
+    {
+      "date": "2026-06-17",
+      "track": "047",
+      "role": "Reference_1",
+      "tide_level_m": 1.53404
+    },
+    {
+      "date": "2026-06-24",
+      "track": "155",
+      "role": "Reference_1",
+      "tide_level_m": 2.7606088888888887
+    },
+    {
+      "date": "2026-06-29",
+      "track": "047",
+      "role": "Reference_2",
+      "tide_level_m": 0.7729355555555555
+    },
+    {
+      "date": "2026-07-06",
+      "track": "155",
+      "role": "Reference_2",
+      "tide_level_m": 3.3243180555555556
+    },
+    {
+      "date": "2026-07-23",
+      "track": "047",
+      "role": "Reference_3",
+      "tide_level_m": 2.031381111111111
+    },
+    {
+      "date": "2026-08-11",
+      "track": "155",
+      "role": "Reference_3",
+      "tide_level_m": 3.0368766666666667
+    },
+    {
+      "date": "2026-08-23",
+      "track": "155",
+      "role": "Reference_4",
+      "tide_level_m": 3.0562375
+    },
+    {
+      "date": "2026-08-28",
+      "track": "047",
+      "role": "Reference_4",
+      "tide_level_m": 1.2212222222222222
+    },
+    {
+      "date": "2026-09-09",
+      "track": "047",
+      "role": "Monitoring_1",
+      "tide_level_m": 0.6635555555555556
+    },
+    {
+      "date": "2026-09-16",
+      "track": "155",
+      "role": "Monitoring_1",
+      "tide_level_m": 3.5409444444444444
+    },
+    {
+      "date": "2026-10-22",
+      "track": "155",
+      "role": "Monitoring_2",
+      "tide_level_m": null
+    },
+    {
+      "date": "2026-10-27",
+      "track": "047",
+      "role": "Monitoring_2",
+      "tide_level_m": null
+    }
+  ],
+  "layers": [
+    {
+      "id": "Z",
+      "track": "047",
+      "branch": "Original",
+      "pol": "HH",
+      "crs": "EPSG:32648",
+      "path": "app_bundle/geotiff/Z_HH_T047.tif",
+      "status": "OK"
+    },
+    {
+      "id": "label",
+      "track": "047",
+      "branch": "Original",
+      "pol": "HH",
+      "crs": "EPSG:32648",
+      "path": "app_bundle/geotiff/label_HH_T047.tif",
+      "status": "OK"
+    },
+    {
+      "id": "temporal",
+      "track": "047",
+      "branch": "Original",
+      "pol": "HH",
+      "crs": "EPSG:32648",
+      "path": "app_bundle/geotiff/temporal_HH_T047.tif",
+      "status": "OK"
+    },
+    {
+      "id": "uncertainty",
+      "track": "047",
+      "branch": "Original",
+      "pol": "HH",
+      "crs": "EPSG:32648",
+      "path": "app_bundle/geotiff/uncertainty_HH_T047.tif",
+      "status": "OK"
+    },
+    {
+      "id": "slope_b",
+      "track": "047",
+      "branch": "Original",
+      "pol": "HH",
+      "crs": "EPSG:32648",
+      "path": "app_bundle/geotiff/slope_b_HH_T047.tif",
+      "status": "OK"
+    },
+    {
+      "id": "Z",
+      "track": "155",
+      "branch": "Original",
+      "pol": "HH",
+      "crs": "EPSG:32648",
+      "path": "app_bundle/geotiff/Z_HH_T155.tif",
+      "status": "OK"
+    },
+    {
+      "id": "label",
+      "track": "155",
+      "branch": "Original",
+      "pol": "HH",
+      "crs": "EPSG:32648",
+      "path": "app_bundle/geotiff/label_HH_T155.tif",
+      "status": "OK"
+    },
+    {
+      "id": "temporal",
+      "track": "155",
+      "branch": "Original",
+      "pol": "HH",
+      "crs": "EPSG:32648",
+      "path": "app_bundle/geotiff/temporal_HH_T155.tif",
+      "status": "OK"
+    },
+    {
+      "id": "uncertainty",
+      "track": "155",
+      "branch": "Original",
+      "pol": "HH",
+      "crs": "EPSG:32648",
+      "path": "app_bundle/geotiff/uncertainty_HH_T155.tif",
+      "status": "OK"
+    },
+    {
+      "id": "slope_b",
+      "track": "155",
+      "branch": "Original",
+      "pol": "HH",
+      "crs": "EPSG:32648",
+      "path": "app_bundle/geotiff/slope_b_HH_T155.tif",
+      "status": "OK"
+    }
+  ],
+  "params": {
+    "sigma_floor": {
+      "047": 0.16944989562034607,
+      "155": 0.1940133422613144
+    },
+    "thresholds": {
+      "Z_THR": -3.0,
+      "Z_POS": 3.0,
+      "MIN_DB_DROP": 1.5
+    },
+    "k": 0.5,
+    "h": 4.0,
+    "multilook": 10
+  },
+  "veg_mask_status": {
+    "047": "PROVISIONAL_UNVALIDATED_OTSU",
+    "155": "PROVISIONAL_UNVALIDATED_OTSU"
+  },
+  "validation_status": "NOT VALIDATED",
+  "tide_status": "PARTIAL",
+  "lattice_status": "LATTICE_ALIGNED",
+  "nrt_status": {
+    "047": "NRT: NOT APPLICABLE (n_ref=4)",
+    "155": "NRT: NOT APPLICABLE (n_ref=4)"
+  },
+  "ltae": {
+    "047": {
+      "rmses": {
+        "median": 0.7175205945968628,
+        "ols": 0.5804962515830994,
+        "ltae": 1.1365253925323486
+      },
+      "n_params": 21890,
+      "n_samples": 263684,
+      "trained": true,
+      "report": "Track 047 L-TAE Ref RMSE: 1.137 dB vs OLS=0.580 dB, Med=0.718 dB"
+    },
+    "155": {
+      "rmses": {
+        "median": 0.7456983327865601,
+        "ols": 0.6162800192832947,
+        "ltae": 1.2845550775527954
+      },
+      "n_params": 21890,
+      "n_samples": 272732,
+      "trained": true,
+      "report": "Track 155 L-TAE Ref RMSE: 1.285 dB vs OLS=0.616 dB, Med=0.746 dB"
+    }
+  },
+  "version": "1.0"
+}
