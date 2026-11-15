@@ -9,7 +9,11 @@ from . import main
 class MainCacheTests(unittest.TestCase):
     def test_vercel_defaults_to_writable_tmp_cache(self):
         with patch.dict(os.environ, {"VERCEL": "1", "GCOV_CACHE_DIR": ""}, clear=False):
-            self.assertEqual(main.default_gcov_cache_dir(), Path(os.getenv("TMPDIR", "/tmp")) / "tideaware" / "gcov")
+            self.assertEqual(main.default_gcov_cache_dir(), main.runtime_temp_root() / "tideaware" / "gcov")
+
+    def test_vercel_ignores_relative_local_cache_override(self):
+        with patch.dict(os.environ, {"VERCEL": "1", "GCOV_CACHE_DIR": ".cache/gcov"}, clear=False):
+            self.assertEqual(main.default_gcov_cache_dir(), main.runtime_temp_root() / "tideaware" / "gcov")
 
     def test_local_defaults_to_repository_cache(self):
         with patch.dict(os.environ, {"VERCEL": "", "GCOV_CACHE_DIR": ""}, clear=False):

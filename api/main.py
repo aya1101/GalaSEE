@@ -3,6 +3,7 @@ import re
 import hashlib
 import json
 import asyncio
+import tempfile
 import uuid
 from typing import Literal
 from datetime import datetime, timezone
@@ -33,12 +34,29 @@ load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 REPOSITORY_ROOT = Path(__file__).resolve().parent.parent
 
 
+def runtime_temp_root() -> Path:
+    return Path(os.getenv("TMPDIR") or tempfile.gettempdir())
+
+
 def default_gcov_cache_dir() -> Path:
     configured = os.getenv("GCOV_CACHE_DIR", "").strip()
+    if os.getenv("VERCEL"):
+        # Relative paths from local .env files are not writable in a deployed
+        # Vercel function. Only honor an explicit absolute path under the
+        # writable temp directory; otherwise keep all runtime cache writes in
+        # the function's scratch space.
+        temp_root = runtime_temp_root().resolve()
+        if configured:
+            configured_path = Path(configured)
+            try:
+                configured_path.resolve().relative_to(temp_root)
+            except ValueError:
+                pass
+            else:
+                return configured_path
+        return runtime_temp_root() / "tideaware" / "gcov"
     if configured:
         return Path(configured)
-    if os.getenv("VERCEL"):
-        return Path(os.getenv("TMPDIR", "/tmp")) / "tideaware" / "gcov"
     return REPOSITORY_ROOT / ".cache" / "gcov"
 
 
