@@ -1,117 +1,93 @@
-const modules = [
+
+"use client";
+
+import { useCallback, useState } from "react";
+import dynamic from "next/dynamic";
+import { useRouter } from "next/navigation";
+
+import LandingHero from "../components/LandingHero";
+import Starfield from "../components/Starfield";
+import RegionSelector from "../components/RegionSelector";
+
+const EarthGlobe = dynamic(
+  () => import("../components/EarthGlobe"),
   {
-    label: "01",
-    title: "Coastal Change Explorer",
-    description: "Compare radar observations and surface change across time.",
-  },
-  {
-    label: "02",
-    title: "Tide-Aware Verification",
-    description: "Put each signal beside its tide context and uncertainty.",
-  },
-  {
-    label: "03",
-    title: "Mission Planner",
-    description: "Turn evidence into a ranked list of field actions.",
-  },
-];
+    ssr: false,
+  }
+);
 
 export default function Home() {
-  const apiConfigured = Boolean(process.env.NEXT_PUBLIC_API_URL);
+  const router = useRouter();
+
+  const [isRegionOpen, setIsRegionOpen] = useState(false);
+  const [flyToRegion, setFlyToRegion] = useState(false);
+  const [selectedRegion, setSelectedRegion] = useState("");
+
+  // Click Earth -> open region selector
+  const handleEarthClick = useCallback(() => {
+    if (flyToRegion) return;
+
+    console.log("OPENING REGION SELECTOR");
+    setIsRegionOpen(true);
+  }, [flyToRegion]);
+
+  // Choose region -> start camera animation
+  const handleSelectRegion = useCallback((region: string) => {
+    console.log("SELECTED REGION:", region);
+
+    setIsRegionOpen(false);
+    setSelectedRegion(region);
+    setFlyToRegion(true);
+  }, []);
+
+  // Camera animation completed -> open Explorer
+  const handleFlightComplete = useCallback(() => {
+    if (!selectedRegion) return;
+
+    router.push(
+      `/explorer?region=${encodeURIComponent(selectedRegion)}`
+    );
+  }, [router, selectedRegion]);
 
   return (
-    <main className="shell">
-      <nav className="nav">
-        <div className="brand">
-          <span className="brand-mark" aria-hidden="true" />
-          <span>TideAware</span>
-        </div>
-        <span className="nav-status">
-          <span className="status-dot" />
-          Initial platform shell
-        </span>
-      </nav>
+    <main
+      className="welcome-page"
+      style={{
+        position: "relative",
+        width: "100%",
+        height: "100dvh",
+        minHeight: "600px",
+        overflow: "hidden",
+        background: "#03060d",
+      }}
+    >
+      {/* Animated star background */}
+      <Starfield />
 
-      <section className="hero">
-        <div className="hero-copy">
-          <p className="eyebrow">COASTAL INTELLIGENCE / 0.1</p>
-          <h1>Find the changes worth checking.</h1>
-          <p className="lede">
-            TideAware connects NISAR radar signals, tide context and field
-            evidence so conservation teams can prioritize real threats.
-          </p>
-          <div className="hero-actions">
-            <a className="button button-primary" href="#modules">
-              Explore the platform
-            </a>
-            <a className="button button-quiet" href="/api/health">
-              Check web health ↗
-            </a>
-          </div>
-        </div>
+      {/* Rotating interactive Earth */}
+      <EarthGlobe
+        onEarthClick={handleEarthClick}
+        flyToRegion={flyToRegion}
+        onFlightComplete={handleFlightComplete}
+      />
 
-        <div className="signal-panel" aria-label="Platform status">
-          <div className="panel-topline">
-            <span>PLATFORM STATUS</span>
-            <span className="mono">LIVE SHELL</span>
-          </div>
-          <div className="signal-grid">
-            <div>
-              <span className="signal-value">03</span>
-              <span className="signal-label">core modules</span>
-            </div>
-            <div>
-              <span className="signal-value">L-band</span>
-              <span className="signal-label">radar context</span>
-            </div>
-            <div>
-              <span className="signal-value">{apiConfigured ? "API" : "LOCAL"}</span>
-              <span className="signal-label">runtime mode</span>
-            </div>
-          </div>
-          <div className="waveform" aria-hidden="true">
-            <span />
-            <span />
-            <span />
-            <span />
-            <span />
-            <span />
-            <span />
-            <span />
-            <span />
-            <span />
-            <span />
-            <span />
-          </div>
-          <p className="panel-note">
-            Ready for Supabase data, MapLibre layers and a FastAPI connection.
-          </p>
-        </div>
-      </section>
+      {/* Welcome text */}
+      <LandingHero />
 
-      <section className="module-section" id="modules">
-        <div className="section-heading">
-          <p className="eyebrow">THE FIRST BUILD</p>
-          <h2>From observation to action.</h2>
+      {/* Camera flight indicator */}
+      {flyToRegion && (
+        <div className="flight-status">
+          <span className="flight-status-dot" />
+          LOCATING COASTAL OBSERVATION AREA...
         </div>
-        <div className="module-list">
-          {modules.map((module) => (
-            <article className="module-row" key={module.label}>
-              <span className="module-label">{module.label}</span>
-              <h3>{module.title}</h3>
-              <p>{module.description}</p>
-              <span className="module-arrow" aria-hidden="true">
-                ↗
-              </span>
-            </article>
-          ))}
-        </div>
-      </section>
+      )}
 
-      <footer className="footer">
-        <span>TIDEAWARE / NASA SPACE APPS CONCEPT</span>
-        <span className="mono">NEXT + FASTAPI + SUPABASE</span>
-      </footer>
+      {/* Region selection modal */}
+      <RegionSelector
+        isOpen={isRegionOpen}
+        onClose={() => setIsRegionOpen(false)}
+        onSelect={handleSelectRegion}
+      />
     </main>
   );
 }

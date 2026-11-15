@@ -1,0 +1,47 @@
+[
+  {
+    "documentId": "nisar-l2-gcov-spec",
+    "title": "NISAR Level-2 GCOV Product Specification",
+    "authority": "NASA/JPL",
+    "canonicalUrl": "https://cumulus.asf.earthdatacloud.nasa.gov/PUBLIC/DATA/NISAR/NISAR_D-102274_RevF_NASA_SDS_Product_Specification_L2_GCOV_w-esigs.pdf",
+    "documentVersion": "RevF",
+    "status": "approved",
+    "topics": ["GCOV", "NISAR", "product-specification"]
+  },
+  {
+    "documentId": "asf-gcov-guide",
+    "title": "ASF GCOV Data User Guide",
+    "authority": "ASF/NASA",
+    "canonicalUrl": "https://hyp3-docs.asf.alaska.edu/nisar-docs/gcov/",
+    "documentVersion": "current",
+    "status": "approved",
+    "topics": ["GCOV", "HHHH", "HVHV", "mask", "dB"]
+  },
+  {
+    "documentId": "asf-nisar-hdf5-format",
+    "title": "ASF NISAR HDF5 Data Format",
+    "authority": "ASF/NASA",
+    "canonicalUrl": "https://nisar-docs-test.asf.alaska.edu/data-format",
+    "documentVersion": "current",
+    "status": "approved",
+    "topics": ["HDF5", "geolocation", "frequency"]
+  },
+  {
+    "documentId": "asf-search-api",
+    "title": "ASF Search API",
+    "authority": "ASF/NASA",
+    "canonicalUrl": "https://docs.asf.alaska.edu/api/cookbook/",
+    "documentVersion": "current",
+    "status": "approved",
+    "topics": ["catalog", "scene", "footprint"]
+  },
+  {
+    "documentId": "nasa-cmr-search-api",
+    "title": "NASA CMR Search API",
+    "authority": "NASA Earthdata",
+    "canonicalUrl": "https://cmr.earthdata.nasa.gov/search/site/docs/search/api.html",
+    "documentVersion": "current",
+    "status": "approved",
+    "topics": ["catalog", "CMR", "search"]
+  }
+]

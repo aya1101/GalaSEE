@@ -4,7 +4,15 @@ node_modules/
 .vercel/
 out/
 coverage/
+.cache/
 *.log
+*.log.*
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.eslintcache
+.turbo/
 .env
 .env.*
 !.env.example
@@ -17,3 +25,33 @@ venv/
 dist/
 build/
 .DS_Store
+Thumbs.db
+
+# Local agent/dev session state
+.history/
+.gstack/
+.superpowers/
+.codex/
+
+# Python tooling and test reports
+.mypy_cache/
+.ruff_cache/
+.pyre/
+.hypothesis/
+.coverage
+.coverage.*
+htmlcov/
+*.egg-info/
+
+# Local runtime files
+*.pid
+*.pid.lock
+*.sqlite3
+*.db
+
+# Downloaded Earthdata/raster artifacts
+*.h5
+*.hdf5
+*.tif
+*.tiff
+*.vrt
