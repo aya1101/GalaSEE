@@ -5,7 +5,8 @@ import Image from "next/image";
 import type { CopilotCitation, CopilotContext, CopilotMessage, UiAction } from "./copilot-types";
 import chatbotLogo from "@/chatbot-logo.png";
 
-type CommonProps = { open: boolean; onClose: () => void; onUndo?: () => void; canUndo?: boolean; onPanelDragStart?: (event: ReactPointerEvent<HTMLElement>) => void };
+type CopilotLanguage = "en" | "vi";
+type CommonProps = { language?: CopilotLanguage; open: boolean; onClose: () => void; onUndo?: () => void; canUndo?: boolean; onPanelDragStart?: (event: ReactPointerEvent<HTMLElement>) => void };
 type LegacyProps = { context: CopilotContext; onAction: (action: UiAction) => void };
 type AdapterProps = { mapContext: CopilotContext; onUiAction: (action: UiAction) => void };
 export type CopilotPanelProps = CommonProps & (LegacyProps | AdapterProps);
@@ -150,14 +151,19 @@ function MarkdownMessage({ text }: { text: string }) {
   return <div className="copilot-markdown">{blocks}</div>;
 }
 
-function progressLabel(stage: string) {
-  const labels: Record<string, string> = {
+function progressLabel(stage: string, language: CopilotLanguage) {
+  const labels: Record<string, string> = language === "en" ? {
+    reading_map_context: "Reading the map context",
+    retrieving_sources: "Retrieving official sources",
+    calling_model: "Analyzing",
+    blocked: "Checking the request",
+  } : {
     reading_map_context: "Mình đang đọc ngữ cảnh bản đồ",
     retrieving_sources: "Mình đang tìm nguồn chính thức",
     calling_model: "Mình đang phân tích",
     blocked: "Mình đang kiểm tra yêu cầu",
   };
-  return labels[stage] ?? "Mình đang kiểm tra dữ liệu";
+  return labels[stage] ?? (language === "en" ? "Checking the data" : "Mình đang kiểm tra dữ liệu");
 }
 
 function safeAction(value: unknown, contextVersion: number): UiAction | null {
@@ -171,15 +177,14 @@ function safeAction(value: unknown, contextVersion: number): UiAction | null {
   return { action: candidate.action as UiAction["action"], arguments: argumentsValue };
 }
 
-const COMMON_QUESTIONS = [
-  "HVHV là gì?",
-  "HHHH và HVHV khác nhau thế nào?",
-  "Scene này có dữ liệu không?",
-  "Mở thống kê khu vực",
-];
+const COMMON_QUESTIONS = {
+  en: ["What is HVHV?", "How do HHHH and HVHV differ?", "Does this scene have data?", "Open area statistics"],
+  vi: ["HVHV là gì?", "HHHH và HVHV khác nhau thế nào?", "Scene này có dữ liệu không?", "Mở thống kê khu vực"],
+} as const;
 
 export function CopilotPanel(props: CopilotPanelProps) {
-  const { open, onClose, onUndo, canUndo = false, onPanelDragStart } = props;
+  const { language = "vi", open, onClose, onUndo, canUndo = false, onPanelDragStart } = props;
+  const isEnglish = language === "en";
   const mapContext = "mapContext" in props ? props.mapContext : props.context;
   const onUiAction = "onUiAction" in props ? props.onUiAction : props.onAction;
   const [messages, setMessages] = useState<CopilotMessage[]>([]);
@@ -197,13 +202,13 @@ export function CopilotPanel(props: CopilotPanelProps) {
     if (!message || sending) return;
     const userMessage: CopilotMessage = { id: `${Date.now()}-user`, role: "user", text: message };
     const assistantId = `${Date.now()}-assistant`;
-    setMessages((current) => [...current, userMessage, { id: assistantId, role: "assistant", text: "", progress: "Mình đang đọc bản đồ…" }]);
+    setMessages((current) => [...current, userMessage, { id: assistantId, role: "assistant", text: "", progress: isEnglish ? "Reading the map…" : "Mình đang đọc bản đồ…" }]);
     setInput("");
     setSending(true);
     const controller = new AbortController();
     abortRef.current = controller;
     try {
-      const response = await fetch(endpoint(), { method: "POST", headers: { "Content-Type": "application/json", Accept: "text/event-stream" }, body: JSON.stringify({ conversationId: "browser-session", message, mapContext }), signal: controller.signal });
+      const response = await fetch(endpoint(), { method: "POST", headers: { "Content-Type": "application/json", Accept: "text/event-stream" }, body: JSON.stringify({ conversationId: "browser-session", message, language, mapContext }), signal: controller.signal });
       if (!response.ok || !response.body) throw new Error(`Copilot request failed: ${response.status}`);
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
@@ -217,8 +222,8 @@ export function CopilotPanel(props: CopilotPanelProps) {
           const parsed = parseSseChunk(chunk);
           if (!parsed) continue;
           if (parsed.event === "token") setMessages((current) => current.map((item) => item.id === assistantId ? { ...item, text: `${item.text}${String(parsed.data.text ?? "")}`, progress: undefined } : item));
-          if (parsed.event === "status") setMessages((current) => current.map((item) => item.id === assistantId ? { ...item, progress: progressLabel(String(parsed.data.stage ?? "")) } : item));
-          if (parsed.event === "tool") setMessages((current) => current.map((item) => item.id === assistantId ? { ...item, progress: "Mình đang kiểm tra dữ liệu" } : item));
+          if (parsed.event === "status") setMessages((current) => current.map((item) => item.id === assistantId ? { ...item, progress: progressLabel(String(parsed.data.stage ?? ""), language) } : item));
+          if (parsed.event === "tool") setMessages((current) => current.map((item) => item.id === assistantId ? { ...item, progress: isEnglish ? "Checking the data" : "Mình đang kiểm tra dữ liệu" } : item));
           if (parsed.event === "citation") setMessages((current) => current.map((item) => {
             if (item.id !== assistantId) return item;
             const citation = parsed.data as unknown as CopilotCitation;
@@ -235,26 +240,26 @@ export function CopilotPanel(props: CopilotPanelProps) {
             const provenance = Array.isArray(parsed.data.provenance) ? parsed.data.provenance as CopilotMessage["provenance"] : undefined;
             setMessages((current) => current.map((item) => item.id === assistantId ? { ...item, text: String(parsed.data.text ?? item.text), status: String(parsed.data.status ?? "UNKNOWN"), actions, provenance, progress: undefined } : item));
           }
-          if (parsed.event === "error") setMessages((current) => current.map((item) => item.id === assistantId ? { ...item, text: String(parsed.data.message ?? "Copilot gặp lỗi."), status: "ERROR", progress: undefined } : item));
+          if (parsed.event === "error") setMessages((current) => current.map((item) => item.id === assistantId ? { ...item, text: String(parsed.data.message ?? (isEnglish ? "Copilot encountered an error." : "Copilot gặp lỗi.")), status: "ERROR", progress: undefined } : item));
         }
         if (result.done) break;
       }
     } catch (error) {
-      if ((error as Error).name !== "AbortError") setMessages((current) => current.map((item) => item.id === assistantId ? { ...item, text: "Không kết nối được copilot. Map và analytics vẫn hoạt động độc lập.", status: "ERROR", progress: undefined } : item));
+      if ((error as Error).name !== "AbortError") setMessages((current) => current.map((item) => item.id === assistantId ? { ...item, text: isEnglish ? "Could not connect to Copilot. The map and analytics still work independently." : "Không kết nối được copilot. Map và analytics vẫn hoạt động độc lập.", status: "ERROR", progress: undefined } : item));
     } finally { setSending(false); abortRef.current = null; }
   }
 
   return (
     <aside className="copilot-panel" aria-label="GalaSEE Assistant">
-      <div className="copilot-header" onPointerDown={(event) => { if (!(event.target as HTMLElement).closest("button")) onPanelDragStart?.(event); }}><div className="copilot-title"><span className="copilot-title-avatar"><Image src={chatbotLogo} alt="" aria-hidden="true" width={32} height={32} priority /></span><div><h2>GalaSEE Assistant</h2></div></div><div className="copilot-header-actions"><button className="copilot-undo" onClick={onUndo} disabled={!canUndo} aria-label="Hoàn tác thao tác gần nhất">Hoàn tác</button><button className="copilot-close" onClick={onClose} aria-label="Đóng trợ lý">×</button></div></div>
+      <div className="copilot-header" onPointerDown={(event) => { if (!(event.target as HTMLElement).closest("button")) onPanelDragStart?.(event); }}><div className="copilot-title"><span className="copilot-title-avatar"><Image src={chatbotLogo} alt="" aria-hidden="true" width={32} height={32} priority /></span><div><h2>GalaSEE Assistant</h2></div></div><div className="copilot-header-actions"><button className="copilot-undo" onClick={onUndo} disabled={!canUndo} aria-label={isEnglish ? "Undo the last action" : "Hoàn tác thao tác gần nhất"}>{isEnglish ? "Undo" : "Hoàn tác"}</button><button className="copilot-close" onClick={onClose} aria-label={isEnglish ? "Close assistant" : "Đóng trợ lý"}>×</button></div></div>
       <div className="copilot-messages">
-        {messages.length === 0 && <div className="copilot-empty"><strong>Hỏi về bản đồ đang xem</strong><div className="copilot-suggestions">{COMMON_QUESTIONS.map((question) => <button key={question} type="button" onClick={() => void send(question)} disabled={sending}>{question}</button>)}</div></div>}
+        {messages.length === 0 && <div className="copilot-empty"><strong>{isEnglish ? "Ask about the map you are viewing" : "Hỏi về bản đồ đang xem"}</strong><div className="copilot-suggestions">{COMMON_QUESTIONS[language].map((question) => <button key={question} type="button" onClick={() => void send(question)} disabled={sending}>{question}</button>)}</div></div>}
         {messages.map((message) => {
           const provenanceLabels = [...new Set((message.provenance ?? []).filter((item) => item.source !== "OpenRouter").map((item) => String(item.source ?? "")).filter(Boolean))];
-          return <div key={message.id} className={`copilot-message ${message.role}`}>{message.text ? <MarkdownMessage text={message.text} /> : <div className="copilot-thinking" role="status" aria-label={message.progress ?? "Đang xử lý"}><span>{message.progress ?? "Đang xử lý"}</span><span className="copilot-dots" aria-hidden="true"><i>.</i><i>.</i><i>.</i></span></div>}{message.provenance && provenanceLabels.length > 0 && <small>Dữ liệu: {provenanceLabels.join(" · ")}</small>}{message.citations?.map((citation) => <a key={`${citation.sourceDocumentId}-${citation.canonicalUrl}`} href={citation.canonicalUrl} target="_blank" rel="noreferrer">Nguồn: {citation.title}</a>)}</div>;
+          return <div key={message.id} className={`copilot-message ${message.role}`}>{message.text ? <MarkdownMessage text={message.text} /> : <div className="copilot-thinking" role="status" aria-label={message.progress ?? (isEnglish ? "Processing" : "Đang xử lý")}><span>{message.progress ?? (isEnglish ? "Processing" : "Đang xử lý")}</span><span className="copilot-dots" aria-hidden="true"><i>.</i><i>.</i><i>.</i></span></div>}{message.provenance && provenanceLabels.length > 0 && <small>{isEnglish ? "Data:" : "Dữ liệu:"} {provenanceLabels.join(" · ")}</small>}{message.citations?.map((citation) => <a key={`${citation.sourceDocumentId}-${citation.canonicalUrl}`} href={citation.canonicalUrl} target="_blank" rel="noreferrer">{isEnglish ? "Source:" : "Nguồn:"} {citation.title}</a>)}</div>;
         })}
       </div>
-      <div className="copilot-composer"><textarea value={input} onChange={(event) => setInput(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); void send(); } }} placeholder="Hỏi về lớp dữ liệu hoặc scene đang xem…" rows={1} /><button className="copilot-send" aria-label={sending ? "Đang gửi" : "Gửi"} onClick={() => void send()} disabled={sending || !input.trim()}>{sending ? <span className="copilot-send-loading" aria-hidden="true">···</span> : <svg className="copilot-send-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.4 11.2 20.7 3.5a.65.65 0 0 1 .86.8l-6.05 16.2a.65.65 0 0 1-1.2.08l-3.48-6.2-7.1-2.03a.65.65 0 0 1-.33-1.15Z" fill="currentColor" /><path d="m10.65 14.37 4.56-4.28" fill="none" stroke="rgba(255,255,255,.72)" strokeLinecap="round" strokeWidth="1.2" /></svg>}</button></div>
+      <div className="copilot-composer"><textarea value={input} onChange={(event) => setInput(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); void send(); } }} placeholder={isEnglish ? "Ask about the selected layer or scene…" : "Hỏi về lớp dữ liệu hoặc scene đang xem…"} rows={1} /><button className="copilot-send" aria-label={sending ? (isEnglish ? "Sending" : "Đang gửi") : (isEnglish ? "Send" : "Gửi")} onClick={() => void send()} disabled={sending || !input.trim()}>{sending ? <span className="copilot-send-loading" aria-hidden="true">···</span> : <svg className="copilot-send-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.4 11.2 20.7 3.5a.65.65 0 0 1 .86.8l-6.05 16.2a.65.65 0 0 1-1.2.08l-3.48-6.2-7.1-2.03a.65.65 0 0 1-.33-1.15Z" fill="currentColor" /><path d="m10.65 14.37 4.56-4.28" fill="none" stroke="rgba(255,255,255,.72)" strokeLinecap="round" strokeWidth="1.2" /></svg>}</button></div>
     </aside>
   );
 }

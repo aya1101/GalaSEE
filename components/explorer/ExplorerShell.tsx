@@ -13,6 +13,7 @@ import { ExplorerMap } from "@/components/explorer/ExplorerMap";
 import { LayerPanel } from "@/components/explorer/LayerPanel";
 import { SceneInspector } from "@/components/explorer/SceneInspector";
 import { TimelineControl } from "@/components/explorer/TimelineControl";
+import { CollapsibleLegend } from "@/components/explorer/CollapsibleLegend";
 import chatbotLogo from "@/chatbot-logo.png";
 import type { CopilotAnalyticsSnapshot, CopilotContext, UiAction } from "@/components/copilot/copilot-types";
 
@@ -42,6 +43,7 @@ type CatalogMode = "earthdata" | "demo" | "error";
 type AssetMode = "live" | "cached" | "unavailable";
 type DataStatus = "ready" | "partial" | "unknown" | "error";
 type DataTruth = { catalogMode: CatalogMode; assetMode: AssetMode; dataStatus: DataStatus };
+type ExplorerLanguage = "en" | "vi";
 
 const gcovPreviewCache = new Map<string, Promise<PreviewAsset>>();
 
@@ -127,11 +129,12 @@ function formatNumber(value: number | undefined, suffix = "") {
   return `${value.toLocaleString("vi-VN")}${suffix}`;
 }
 
-function formatSceneTimestamp(value: string | undefined) {
+function formatSceneTimestamp(value: string | undefined, language: ExplorerLanguage = "vi") {
   if (!value) return "—";
   const date = new Date(value);
   if (Number.isNaN(date.valueOf())) return value;
-  return `${date.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" })} · ${date.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })}`;
+  const locale = language === "en" ? "en-GB" : "vi-VN";
+  return `${date.toLocaleDateString(locale, { day: "2-digit", month: "2-digit", year: "numeric" })} · ${date.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" })}`;
 }
 
 function sceneShortId(details: RegionProperties) {
@@ -145,10 +148,10 @@ function sceneDisplayTitle(details: RegionProperties) {
   return details.location && !details.location.includes("ASF DAAC") ? details.location : "Cửa Dinh – Cồn Ba Lá";
 }
 
-function formatSceneDate(value: string | undefined) {
-  if (!value) return "Không rõ ngày";
+function formatSceneDate(value: string | undefined, language: ExplorerLanguage = "vi") {
+  if (!value) return language === "en" ? "Unknown date" : "Không rõ ngày";
   const date = new Date(value);
-  return Number.isNaN(date.valueOf()) ? value : date.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" });
+  return Number.isNaN(date.valueOf()) ? value : date.toLocaleDateString(language === "en" ? "en-GB" : "vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" });
 }
 
 function getFeatureCollection(value: unknown): FeatureCollection<Geometry, RegionProperties> | null {
@@ -225,7 +228,7 @@ function imageCoordinates(feature: RegionFeature): [[number, number], [number, n
   return [[minX, maxY], [maxX, maxY], [maxX, minY], [minX, minY]];
 }
 
-function featureBounds(feature: RegionFeature | undefined): [[number, number], [number, number]] | null {
+function featureBounds(feature: Feature<Geometry> | undefined): [[number, number], [number, number]] | null {
   if (!feature || feature.geometry.type !== "Polygon") return null;
   const ring = feature.geometry.coordinates[0];
   if (!ring?.length) return null;
@@ -481,6 +484,7 @@ export function ExplorerShell({ region }: ExplorerShellProps) {
   const [pixelInspection, setPixelInspection] = useState<PixelInspection | null>(null);
   const [regionStats, setRegionStats] = useState<RegionStatsState>({ status: "idle" });
   const [activeSection, setActiveSection] = useState<SidebarSection>("map");
+  const [language, setLanguage] = useState<ExplorerLanguage>("vi");
   const [copilotOpen, setCopilotOpen] = useState(false);
   const [copilotDockPosition, setCopilotDockPosition] = useState<{ left: number; top: number } | null>(null);
   const [undoStack, setUndoStack] = useState<UndoSnapshot[]>([]);
@@ -515,6 +519,11 @@ export function ExplorerShell({ region }: ExplorerShellProps) {
   useEffect(() => { regionsRef.current = regions; }, [regions]);
   useEffect(() => { selectedIdRef.current = selectedId; }, [selectedId]);
   useEffect(() => { layersRef.current = layers; }, [layers]);
+  useEffect(() => {
+    const previousLanguage = document.documentElement.lang;
+    document.documentElement.lang = language;
+    return () => { document.documentElement.lang = previousLanguage || "en"; };
+  }, [language]);
   useEffect(() => () => {
     if (rasterObjectUrlRef.current) URL.revokeObjectURL(rasterObjectUrlRef.current);
   }, []);
@@ -755,6 +764,15 @@ export function ExplorerShell({ region }: ExplorerShellProps) {
   };
 
   const toggleLayer = (key: keyof typeof layers) => setLayers((current) => ({ ...current, [key]: !current[key] }));
+  const focusStudyArea = () => {
+    setActiveSection("map");
+    const map = mapRef.current;
+    const bounds = featureBounds(studyAreaGeoJson.features[0]);
+    if (!map || !bounds) return;
+    const fit = () => map.fitBounds(bounds, { padding: { top: 88, right: 72, bottom: 72, left: 72 }, duration: 600, maxZoom: 11.5 });
+    if (map.isStyleLoaded()) fit();
+    else map.once("load", fit);
+  };
   const rememberUndo = () => {
     const snapshot = { selectedId, layers, radarBand, activeSection, mobilePanelOpen };
     undoStackRef.current = [...undoStackRef.current, snapshot].slice(-20);
@@ -807,7 +825,6 @@ export function ExplorerShell({ region }: ExplorerShellProps) {
       setComparison({ status: "error", error: error instanceof Error ? error.message : "Comparison failed" });
     }
   };
-  const radarLayerStatus = gcovStatus === "loading" ? "(đang chuẩn bị preview…)" : gcovStatus === "raster" ? "(browse toàn cảnh + preview GeoTIFF cache)" : gcovStatus === "preview" ? "(browse toàn cảnh)" : gcovStatus === "error" ? "(không có ảnh)" : "";
   const analyticsSnapshot: CopilotAnalyticsSnapshot = {
     radarProfile: {
       status: radarMetric.status,
@@ -893,24 +910,19 @@ export function ExplorerShell({ region }: ExplorerShellProps) {
 
   return (
     <main className="app-shell explorer-shell" data-region={region}>
-      <Topbar loading={loading} dataTruth={dataTruth} />
+      <Topbar loading={loading} dataTruth={dataTruth} language={language} onLanguageChange={setLanguage} />
       <div
         ref={mapWorkspaceRef}
         className={`workspace ${isResizing ? "is-resizing" : ""}`}
         style={{ "--sidebar-width": `${sidebarWidth}px`, "--inspector-width": `${inspectorWidth}px` } as CSSProperties}
       >
         <ExplorerSidebar
-          scene={selectedFeature?.properties ? {
-            id: selectedFeature.properties.id,
-            title: selectedFeature.properties.title,
-            dataMode: dataTruth.catalogMode === "earthdata" && dataTruth.assetMode === "cached" ? "cached" : dataTruth.catalogMode,
-            assetMode: dataTruth.assetMode,
-            dataStatus: dataTruth.dataStatus,
-          } : undefined}
+          language={language}
           layerState={layers}
           onLayerChange={(layer) => toggleLayer(layer as keyof LayerState)}
           activeSection={activeSection}
           onSectionChange={setActiveSection}
+          onStudyAreaFocus={focusStudyArea}
           onResizeStart={startResize}
         />
         <ExplorerMap
@@ -921,85 +933,88 @@ export function ExplorerShell({ region }: ExplorerShellProps) {
           }}
           onPixelSelect={() => setPixelInspection(null)}
         >
-          <div ref={mapNode} className="map-canvas" aria-label="Bản đồ giám sát rừng ngập mặn" />
-          <MapHeader />
+          <div ref={mapNode} className="map-canvas" aria-label={language === "en" ? "Mangrove monitoring map" : "Bản đồ giám sát rừng ngập mặn"} />
+          <MapHeader language={language} />
           <TimelineControl selectedSceneId={selectedId}>
-            <SceneTimeline scenes={studyScenes} selectedId={selectedId} comparisonId={comparisonSceneId} comparison={comparison} playing={timelinePlaying} onSelect={(id) => { setSelectedId(id); setComparisonSceneSelection(undefined); }} onComparisonSelect={setComparisonSceneSelection} onRunComparison={runComparison} onTogglePlay={() => setTimelinePlaying((value) => !value)} />
+            <SceneTimeline language={language} scenes={studyScenes} selectedId={selectedId} comparisonId={comparisonSceneId} comparison={comparison} playing={timelinePlaying} onSelect={(id) => { setSelectedId(id); setComparisonSceneSelection(undefined); }} onComparisonSelect={setComparisonSceneSelection} onRunComparison={runComparison} onTogglePlay={() => setTimelinePlaying((value) => !value)} />
           </TimelineControl>
           <LayerPanel layerState={layers} onLayerChange={(layer) => toggleLayer(layer as keyof LayerState)}>
-            {activeSection === "map" ? <LayerLegend layers={layers} radarBand={radarBand} rasterStyle={rasterStyle} status={radarLayerStatus} onToggle={toggleLayer} onRadarBandChange={setRadarBand} onRasterStyleChange={setRasterStyle} /> : <DataLayersPanel layers={layers} radarBand={radarBand} status={radarLayerStatus} onToggle={toggleLayer} onRadarBandChange={setRadarBand} onClose={() => setActiveSection("map")} />}
+            {activeSection === "map" ? <LayerLegend language={language} layers={layers} radarBand={radarBand} onToggle={toggleLayer} onRadarBandChange={setRadarBand} /> : null}
           </LayerPanel>
           <ScaleBar />
         </ExplorerMap>
-        <Inspector feature={selectedFeature} radarMetric={radarMetric} pixelInspection={pixelInspection} regionStats={regionStats} comparison={comparison} open={mobilePanelOpen} onClose={() => setMobilePanelOpen(false)} onResizeStart={startResize} />
-        <button className="mobile-panel-trigger" onClick={() => setMobilePanelOpen(true)}><Icon name="menu" /> Chi tiết khu vực</button>
+        <Inspector activeSection={activeSection} language={language} layers={layers} radarBand={radarBand} onLayerChange={(layer) => toggleLayer(layer as keyof LayerState)} onRadarBandChange={setRadarBand} onCloseLayers={() => setActiveSection("map")} feature={selectedFeature} radarMetric={radarMetric} pixelInspection={pixelInspection} regionStats={regionStats} comparison={comparison} open={mobilePanelOpen} onClose={() => setMobilePanelOpen(false)} onResizeStart={startResize} />
+        <button className="mobile-panel-trigger" onClick={() => setMobilePanelOpen(true)}><Icon name="menu" /> {language === "en" ? "Area details" : "Chi tiết khu vực"}</button>
         <div className="copilot-dock" style={copilotDockPosition ? { left: copilotDockPosition.left, top: copilotDockPosition.top, right: "auto", bottom: "auto" } : undefined}>
-          <button type="button" className="copilot-bubble" aria-label="Mở GalaSEE Assistant" onPointerDown={startCopilotDrag} onClick={() => setCopilotOpen(true)}><Image src={chatbotLogo} alt="" aria-hidden="true" priority /></button>
-          <CopilotPanel open={copilotOpen} mapContext={copilotContext} onPanelDragStart={startCopilotDrag} onClose={() => setCopilotOpen(false)} onUiAction={handleCopilotAction} onUndo={handleUndo} canUndo={undoStack.length > 0} />
+          <button type="button" className="copilot-bubble" aria-label={language === "en" ? "Open GalaSEE Assistant" : "Mở GalaSEE Assistant"} onPointerDown={startCopilotDrag} onClick={() => setCopilotOpen(true)}><Image src={chatbotLogo} alt="" aria-hidden="true" priority /></button>
+          <CopilotPanel language={language} open={copilotOpen} mapContext={copilotContext} onPanelDragStart={startCopilotDrag} onClose={() => setCopilotOpen(false)} onUiAction={handleCopilotAction} onUndo={handleUndo} canUndo={undoStack.length > 0} />
         </div>
       </div>
     </main>
   );
 }
 
-function Topbar({ loading, dataTruth }: { loading: boolean; dataTruth: DataTruth }) {
+function Topbar({ loading, dataTruth, language, onLanguageChange }: { loading: boolean; dataTruth: DataTruth; language: ExplorerLanguage; onLanguageChange: (language: ExplorerLanguage) => void }) {
+  const isEnglish = language === "en";
   const status = loading
-    ? "Đang đồng bộ"
+    ? isEnglish ? "Syncing data" : "Đang đồng bộ"
     : dataTruth.catalogMode === "error"
-      ? "Nguồn dữ liệu lỗi"
+      ? isEnglish ? "Data source error" : "Nguồn dữ liệu lỗi"
       : dataTruth.catalogMode === "demo"
-        ? "Dữ liệu mô phỏng"
+        ? isEnglish ? "Simulated data" : "Dữ liệu mô phỏng"
         : dataTruth.assetMode === "cached"
-          ? "Earthdata · cache sẵn"
+          ? isEnglish ? "Earthdata · cached" : "Earthdata · cache sẵn"
           : "Earthdata live";
 
   return (
     <header className="topbar">
       <div className="brand-lockup">
-        <div className="brand-mark" aria-hidden="true"><span /></div>
-        <div><strong>TideAware</strong><span>Giám sát rừng ngập mặn ven biển</span></div>
+        <strong className="explorer-title"><span>TIDEAWARE</span><i>.</i></strong>
       </div>
       <div className="topbar-actions">
         <span className="sync-status"><span className="status-dot" /> {status}</span>
-        <span className="updated">Cập nhật: 14/11/2026 · 08:42 (UTC+7)</span>
-        <button className="icon-button" aria-label="Thông báo"><Icon name="bell" /></button>
-        <button className="team-button"><span className="avatar">BT</span><span>Đội bảo tồn</span><span className="caret">⌄</span></button>
+        <span className="updated">{isEnglish ? "Updated" : "Cập nhật"}: 14/11/2026 · 08:42 (UTC+7)</span>
+        <div className="language-switch" role="group" aria-label={isEnglish ? "Language" : "Ngôn ngữ"}>
+          <button type="button" className={isEnglish ? "active" : ""} aria-pressed={isEnglish} onClick={() => onLanguageChange("en")}>EN</button>
+          <button type="button" className={!isEnglish ? "active" : ""} aria-pressed={!isEnglish} onClick={() => onLanguageChange("vi")}>VI</button>
+        </div>
+        <button className="icon-button" aria-label={isEnglish ? "Notifications" : "Thông báo"}><Icon name="bell" /></button>
       </div>
     </header>
   );
 }
 
 function DataLayersPanel({
+  language,
   layers,
   radarBand,
-  status,
   onToggle,
   onRadarBandChange,
   onClose,
 }: {
+  language: ExplorerLanguage;
   layers: LayerState;
   radarBand: RadarBand;
-  status: string;
   onToggle: (key: keyof LayerState) => void;
   onRadarBandChange: (variable: RadarBand) => void;
   onClose: () => void;
 }) {
-  const radarLabel = radarBand === "COMPOSITE" ? "RGB composite" : radarBand;
+  const isEnglish = language === "en";
   return (
-    <section className="data-layers-panel map-overlay" aria-label="Các lớp dữ liệu">
+    <section className="data-layers-panel map-overlay" aria-label={isEnglish ? "Data layers" : "Các lớp dữ liệu"}>
       <div className="data-layers-head">
-        <div><span className="panel-kicker">QUẢN LÝ HIỂN THỊ</span><h2>Lớp dữ liệu</h2></div>
-        <button className="icon-button" aria-label="Đóng lớp dữ liệu" onClick={onClose}><Icon name="close" /></button>
+        <div><span className="panel-kicker">{isEnglish ? "DISPLAY CONTROL" : "QUẢN LÝ HIỂN THỊ"}</span><h2>{isEnglish ? "Data layers" : "Lớp dữ liệu"}</h2></div>
+        <button className="icon-button" aria-label={isEnglish ? "Close data layers" : "Đóng lớp dữ liệu"} onClick={onClose}><Icon name="close" /></button>
       </div>
-      <p className="data-layers-intro">Mỗi lớp trả lời một câu hỏi khác nhau: ảnh radar cho biết vệ tinh quan sát gì, còn các lớp phân tích cho biết hệ thống diễn giải quan sát đó ra sao.</p>
+      <p className="data-layers-intro">{isEnglish ? "Each layer answers a different question: radar shows what the satellite observed, while analysis layers show how the system interprets that observation." : "Mỗi lớp trả lời một câu hỏi khác nhau: ảnh radar cho biết vệ tinh quan sát gì, còn các lớp phân tích cho biết hệ thống diễn giải quan sát đó ra sao."}</p>
       <div className="data-layer-group">
-        <span className="data-layer-group-title">DỮ LIỆU QUAN SÁT</span>
+        <span className="data-layer-group-title">{isEnglish ? "OBSERVATION DATA" : "DỮ LIỆU QUAN SÁT"}</span>
         <div className="data-layer-card">
-          <LayerToggle checked={layers.sceneImage} onChange={() => onToggle("sceneImage")} swatch="legend-swatch swatch-radar">Ảnh radar NISAR · {radarLabel} {status}</LayerToggle>
+          <LayerToggle checked={layers.sceneImage} onChange={() => onToggle("sceneImage")} swatch="legend-swatch swatch-radar">{isEnglish ? "NISAR radar image" : "Ảnh radar NISAR"}</LayerToggle>
           <div className="layer-explanation">
-            <p><b>Ý nghĩa:</b> browse ASF toàn cảnh được hiển thị ngay; preview PNG được tạo từ GeoTIFF thật ở backend rồi phủ lên AOI sau khi cache xong.</p>
-            <p><b>Cách đọc:</b> vùng sáng/tối là khác biệt về phản xạ; không nên đọc trực tiếp như ảnh màu tự nhiên.</p>
-            <p><b>Nguồn:</b> NISAR L2 GCOV từ ASF DAAC. Đây là ảnh browse để quan sát nhanh, không thay thế giá trị đo trong HDF5.</p>
+            <p><b>{isEnglish ? "Meaning:" : "Ý nghĩa:"}</b> {isEnglish ? "The full ASF browse is shown immediately; a PNG preview is generated from the real backend GeoTIFF and overlaid on the AOI after caching." : "browse ASF toàn cảnh được hiển thị ngay; preview PNG được tạo từ GeoTIFF thật ở backend rồi phủ lên AOI sau khi cache xong."}</p>
+            <p><b>{isEnglish ? "How to read:" : "Cách đọc:"}</b> {isEnglish ? "Bright and dark areas show differences in backscatter; do not read this directly as a natural-color image." : "vùng sáng/tối là khác biệt về phản xạ; không nên đọc trực tiếp như ảnh màu tự nhiên."}</p>
+            <p><b>{isEnglish ? "Source:" : "Nguồn:"}</b> {isEnglish ? "NISAR L2 GCOV from ASF DAAC. This browse image is for quick inspection and does not replace measurements in HDF5." : "NISAR L2 GCOV từ ASF DAAC. Đây là ảnh browse để quan sát nhanh, không thay thế giá trị đo trong HDF5."}</p>
           </div>
           <div className="radar-band-picker panel-band-picker">
             <button type="button" className={radarBand === "COMPOSITE" ? "active" : ""} onClick={() => onRadarBandChange("COMPOSITE")}>RGB</button>
@@ -1008,41 +1023,42 @@ function DataLayersPanel({
           </div>
         </div>
         <div className="data-layer-card">
-          <LayerToggle checked={layers.basemap} onChange={() => onToggle("basemap")} swatch="legend-swatch swatch-basemap">Bản đồ nền</LayerToggle>
+          <LayerToggle checked={layers.basemap} onChange={() => onToggle("basemap")} swatch="legend-swatch swatch-basemap">{isEnglish ? "Basemap" : "Bản đồ nền"}</LayerToggle>
           <div className="layer-explanation">
-            <p><b>Ý nghĩa:</b> nền địa lý giúp định hướng sông, bờ biển và khu vực xung quanh.</p>
-            <p><b>Lưu ý:</b> không phải dữ liệu NISAR và không được dùng để kết luận rừng ngập mặn hay bất thường.</p>
-            <p><b>Nguồn:</b> NASA GIBS Blue Marble.</p>
+            <p><b>{isEnglish ? "Meaning:" : "Ý nghĩa:"}</b> {isEnglish ? "The geographic base helps orient rivers, coastlines, and the surrounding area." : "nền địa lý giúp định hướng sông, bờ biển và khu vực xung quanh."}</p>
+            <p><b>{isEnglish ? "Note:" : "Lưu ý:"}</b> {isEnglish ? "This is not NISAR data and must not be used to conclude mangrove loss or anomalies." : "không phải dữ liệu NISAR và không được dùng để kết luận rừng ngập mặn hay bất thường."}</p>
+            <p><b>{isEnglish ? "Source:" : "Nguồn:"}</b> NASA GIBS Blue Marble.</p>
           </div>
         </div>
       </div>
       <div className="data-layer-group">
-        <span className="data-layer-group-title">LỚP PHÂN TÍCH</span>
+        <span className="data-layer-group-title">{isEnglish ? "ANALYSIS LAYERS" : "LỚP PHÂN TÍCH"}</span>
         <div className="data-layer-card">
-          <LayerToggle checked={layers.aoi} onChange={() => onToggle("aoi")} swatch="legend-outline swatch-aoi">AOI nghiên cứu</LayerToggle>
+          <LayerToggle checked={layers.aoi} onChange={() => onToggle("aoi")} swatch="legend-outline swatch-aoi">{isEnglish ? "Study AOI" : "AOI nghiên cứu"}</LayerToggle>
           <div className="layer-explanation">
-            <p><b>Ý nghĩa:</b> đường biên của khu vực Cửa Dinh – Cồn Ba Lá được dùng để tập trung quan sát.</p>
-            <p><b>Cách đọc:</b> chỉ là ranh giới phạm vi nghiên cứu, không phải kết quả phân loại phủ bề mặt.</p>
+            <p><b>{isEnglish ? "Meaning:" : "Ý nghĩa:"}</b> {isEnglish ? "The boundary of Cua Dinh – Con Ba La focuses the observation area." : "đường biên của khu vực Cửa Dinh – Cồn Ba Lá được dùng để tập trung quan sát."}</p>
+            <p><b>{isEnglish ? "How to read:" : "Cách đọc:"}</b> {isEnglish ? "This is only the study boundary, not a surface-classification result." : "chỉ là ranh giới phạm vi nghiên cứu, không phải kết quả phân loại phủ bề mặt."}</p>
           </div>
         </div>
         <div className="data-layer-card is-disabled">
-          <LayerToggle checked={layers.mangrove} onChange={() => onToggle("mangrove")} swatch="legend-swatch swatch-mangrove">Rừng ngập mặn</LayerToggle>
-          <div className="layer-explanation"><p><b>Ý nghĩa dự kiến:</b> mask các pixel được mô hình xác định là rừng ngập mặn.</p><p><b>Trạng thái:</b> chưa có model phân loại đã xác nhận nên hiện đang tắt.</p></div>
+          <LayerToggle checked={layers.mangrove} onChange={() => onToggle("mangrove")} swatch="legend-swatch swatch-mangrove">{isEnglish ? "Mangrove" : "Rừng ngập mặn"}</LayerToggle>
+          <div className="layer-explanation"><p><b>{isEnglish ? "Expected meaning:" : "Ý nghĩa dự kiến:"}</b> {isEnglish ? "A mask of pixels identified by the model as mangrove." : "mask các pixel được mô hình xác định là rừng ngập mặn."}</p><p><b>{isEnglish ? "Status:" : "Trạng thái:"}</b> {isEnglish ? "No validated classification model is available, so this layer is off." : "chưa có model phân loại đã xác nhận nên hiện đang tắt."}</p></div>
         </div>
         <div className="data-layer-card is-disabled">
-          <LayerToggle checked={layers.anomalies} onChange={() => onToggle("anomalies")} swatch="legend-dot swatch-anomaly">Bất thường</LayerToggle>
-          <div className="layer-explanation"><p><b>Ý nghĩa dự kiến:</b> vùng hoặc điểm có thay đổi tín hiệu đáng chú ý giữa các scene.</p><p><b>Trạng thái:</b> chưa có model phát hiện bất thường nên hiện đang tắt.</p></div>
+          <LayerToggle checked={layers.anomalies} onChange={() => onToggle("anomalies")} swatch="legend-dot swatch-anomaly">{isEnglish ? "Anomalies" : "Bất thường"}</LayerToggle>
+          <div className="layer-explanation"><p><b>{isEnglish ? "Expected meaning:" : "Ý nghĩa dự kiến:"}</b> {isEnglish ? "Areas or points with notable signal changes between scenes." : "vùng hoặc điểm có thay đổi tín hiệu đáng chú ý giữa các scene."}</p><p><b>{isEnglish ? "Status:" : "Trạng thái:"}</b> {isEnglish ? "No validated anomaly-detection model is available, so this layer is off." : "chưa có model phát hiện bất thường nên hiện đang tắt."}</p></div>
         </div>
       </div>
     </section>
   );
 }
 
-function MapHeader() {
-  return <div className="map-overlay map-header-control"><span className="select-label">KHU VỰC NGHIÊN CỨU</span><button className="area-select">Cửa Dinh – Cồn Ba Lá <span>⌄</span></button></div>;
+function MapHeader({ language }: { language: ExplorerLanguage }) {
+  return <div className="map-overlay map-header-control"><span className="select-label">{language === "en" ? "STUDY AREA" : "KHU VỰC NGHIÊN CỨU"}</span><button className="area-select">Cửa Dinh – Cồn Ba Lá <span>⌄</span></button></div>;
 }
 
 function SceneTimeline({
+  language,
   scenes,
   selectedId,
   comparisonId,
@@ -1053,6 +1069,7 @@ function SceneTimeline({
   onRunComparison,
   onTogglePlay,
 }: {
+  language: ExplorerLanguage;
   scenes: RegionFeature[];
   selectedId: string;
   comparisonId?: string;
@@ -1066,6 +1083,7 @@ function SceneTimeline({
   if (scenes.length === 0) return null;
   const selectedIndex = Math.max(0, scenes.findIndex((scene) => scene.properties.id === selectedId));
   const selectedScene = scenes[selectedIndex];
+  const isEnglish = language === "en";
   const selectRelative = (offset: number) => {
     const nextIndex = (selectedIndex + offset + scenes.length) % scenes.length;
     onSelect(scenes[nextIndex].properties.id);
@@ -1074,15 +1092,15 @@ function SceneTimeline({
     <div className="timeline-control map-overlay">
       <div className="timeline-head">
         <div>
-          <span className="timeline-kicker">DÒNG THỜI GIAN QUAN SÁT</span>
-          <strong>{formatSceneDate(selectedScene.properties.startTime)}</strong>
+          <span className="timeline-kicker">{isEnglish ? "OBSERVATION TIMELINE" : "DÒNG THỜI GIAN QUAN SÁT"}</span>
+          <strong>{formatSceneDate(selectedScene.properties.startTime, language)}</strong>
         </div>
-        <span className="timeline-count">Scene {selectedIndex + 1} / {scenes.length}</span>
+        <span className="timeline-count">{isEnglish ? "Scene" : "Scene"} {selectedIndex + 1} / {scenes.length}</span>
       </div>
       <div className="timeline-actions">
-        <button type="button" aria-label="Scene trước" onClick={() => selectRelative(-1)}>‹</button>
-        <button type="button" className="timeline-play" aria-label={playing ? "Tạm dừng timeline" : "Phát timeline"} onClick={onTogglePlay}>{playing ? "Ⅱ" : "▶"}</button>
-        <button type="button" aria-label="Scene sau" onClick={() => selectRelative(1)}>›</button>
+        <button type="button" aria-label={isEnglish ? "Previous scene" : "Scene trước"} onClick={() => selectRelative(-1)}>‹</button>
+        <button type="button" className="timeline-play" aria-label={playing ? (isEnglish ? "Pause timeline" : "Tạm dừng timeline") : (isEnglish ? "Play timeline" : "Phát timeline")} onClick={onTogglePlay}>{playing ? "Ⅱ" : "▶"}</button>
+        <button type="button" aria-label={isEnglish ? "Next scene" : "Scene sau"} onClick={() => selectRelative(1)}>›</button>
       </div>
       <input
         className="timeline-range"
@@ -1091,64 +1109,74 @@ function SceneTimeline({
         max={scenes.length - 1}
         step="1"
         value={selectedIndex}
-        aria-label="Chọn scene theo thời gian"
+        aria-label={isEnglish ? "Select scene by time" : "Chọn scene theo thời gian"}
         onChange={(event) => onSelect(scenes[Number(event.target.value)].properties.id)}
       />
       <div className="timeline-ticks" style={{ gridTemplateColumns: `repeat(${scenes.length}, 1fr)` }} aria-hidden="true">
-        {scenes.map((scene, index) => <span key={scene.properties.id} className={index === selectedIndex ? "active" : ""} title={formatSceneDate(scene.properties.startTime)} />)}
+        {scenes.map((scene, index) => <span key={scene.properties.id} className={index === selectedIndex ? "active" : ""} title={formatSceneDate(scene.properties.startTime, language)} />)}
       </div>
-      <div className="timeline-endpoints"><span>{formatSceneDate(scenes[0].properties.startTime)}</span><span>{formatSceneDate(scenes[scenes.length - 1].properties.startTime)}</span></div>
+      <div className="timeline-endpoints"><span>{formatSceneDate(scenes[0].properties.startTime, language)}</span><span>{formatSceneDate(scenes[scenes.length - 1].properties.startTime, language)}</span></div>
       {scenes.length > 1 && <div className="comparison-controls">
-        <label><span>So sánh với</span><select value={comparisonId ?? ""} onChange={(event) => onComparisonSelect(event.target.value)}>{scenes.filter((scene) => scene.properties.id !== selectedId).map((scene) => <option key={scene.properties.id} value={scene.properties.id}>{formatSceneDate(scene.properties.startTime)} · {sceneShortId(scene.properties)}</option>)}</select></label>
-        <button type="button" className="comparison-button" disabled={!comparisonId || ["checking", "queued", "running"].includes(comparison.status)} onClick={onRunComparison}>{comparison.status === "checking" || comparison.status === "queued" || comparison.status === "running" ? "Đang phân tích…" : "So sánh"}</button>
-        {comparison.status === "blocked" && <p className="comparison-warning">Bị khóa: {(comparison.report?.blockingIssues ?? []).join(", ") || "metadata chưa tương thích"}.</p>}
-        {comparison.status === "ready" && <p className="comparison-success">Candidate change đã sẵn sàng · cần kiểm chứng.</p>}
+        <label><span>{isEnglish ? "Compare with" : "So sánh với"}</span><select value={comparisonId ?? ""} onChange={(event) => onComparisonSelect(event.target.value)}>{scenes.filter((scene) => scene.properties.id !== selectedId).map((scene) => <option key={scene.properties.id} value={scene.properties.id}>{formatSceneDate(scene.properties.startTime, language)} · {sceneShortId(scene.properties)}</option>)}</select></label>
+        <button type="button" className="comparison-button" disabled={!comparisonId || ["checking", "queued", "running"].includes(comparison.status)} onClick={onRunComparison}>{comparison.status === "checking" || comparison.status === "queued" || comparison.status === "running" ? (isEnglish ? "Analyzing…" : "Đang phân tích…") : (isEnglish ? "Compare" : "So sánh")}</button>
+        {comparison.status === "blocked" && <p className="comparison-warning">{isEnglish ? "Blocked:" : "Bị khóa:"} {(comparison.report?.blockingIssues ?? []).join(", ") || (isEnglish ? "incompatible metadata" : "metadata chưa tương thích")}.</p>}
+        {comparison.status === "ready" && <p className="comparison-success">{isEnglish ? "Candidate change is ready · field verification required." : "Candidate change đã sẵn sàng · cần kiểm chứng."}</p>}
       </div>}
     </div>
   );
 }
 
 function LayerLegend({
+  language,
   layers,
   radarBand,
-  rasterStyle,
-  status,
   onToggle,
   onRadarBandChange,
-  onRasterStyleChange,
 }: {
+  language: ExplorerLanguage;
   layers: LayerState;
   radarBand: RadarBand;
-  rasterStyle: RasterStyle;
-  status: string;
   onToggle: (key: keyof LayerState) => void;
   onRadarBandChange: (variable: RadarBand) => void;
-  onRasterStyleChange: (style: RasterStyle) => void;
 }) {
-  const radarLabel = radarBand === "COMPOSITE" ? "RGB composite" : radarBand;
+  const [mapLayersOpen, setMapLayersOpen] = useState(true);
+  const [legendOpen, setLegendOpen] = useState(true);
+  const isEnglish = language === "en";
   return (
-    <div className="layer-legend map-overlay">
-      <div className="legend-title">Lớp bản đồ</div>
-      <LayerToggle checked={layers.mangrove} onChange={() => onToggle("mangrove")} swatch="legend-swatch swatch-mangrove">Rừng ngập mặn</LayerToggle>
-      <LayerToggle checked={layers.anomalies} onChange={() => onToggle("anomalies")} swatch="legend-dot swatch-anomaly">Bất thường</LayerToggle>
-      <LayerToggle checked={layers.aoi} onChange={() => onToggle("aoi")} swatch="legend-outline swatch-aoi">AOI nghiên cứu</LayerToggle>
-      <LayerToggle checked={layers.sceneImage} onChange={() => onToggle("sceneImage")} swatch="legend-swatch swatch-radar">Ảnh radar NISAR · {radarLabel} {status}</LayerToggle>
-      <div className="radar-band-picker">
-        <button type="button" className={radarBand === "COMPOSITE" ? "active" : ""} onClick={() => onRadarBandChange("COMPOSITE")}>RGB</button>
-        <button type="button" className={radarBand === "HHHH" ? "active" : ""} onClick={() => onRadarBandChange("HHHH")}>HHHH</button>
-        <button type="button" className={radarBand === "HVHV" ? "active" : ""} onClick={() => onRadarBandChange("HVHV")}>HVHV</button>
-      </div>
-      {layers.sceneImage && <div className="raster-style-controls"><label>Hiển thị <select value={rasterStyle.mode} onChange={(event) => onRasterStyleChange({ ...rasterStyle, mode: event.target.value as RasterStyle["mode"] })}><option value="grayscale">Grayscale</option><option value="heatmap">Heatmap</option></select></label><label>Opacity <input type="range" min="0.2" max="1" step="0.05" value={rasterStyle.opacity} onChange={(event) => onRasterStyleChange({ ...rasterStyle, opacity: Number(event.target.value) })} /></label><small>P{Math.round(rasterStyle.lowPercentile * 100)}–P{Math.round(rasterStyle.highPercentile * 100)} stretch · dB</small></div>}
-      <LayerToggle checked={layers.basemap} onChange={() => onToggle("basemap")} swatch="legend-swatch swatch-basemap">Bản đồ nền</LayerToggle>
-      <div className="legend-divider" />
-      <div className="legend-title">Chú giải</div>
-      <div className="key-row"><i className="legend-swatch swatch-mangrove" />Rừng ngập mặn</div>
-      <div className="key-row"><i className="legend-swatch swatch-selected" />Khu vực đang chọn</div>
-      <div className="key-row"><i className="legend-swatch swatch-anomaly-area" />Vùng bất thường</div>
-      <div className="key-row"><i className="legend-dot swatch-anomaly" />Điểm bất thường</div>
-      <div className="key-row"><i className="legend-outline swatch-candidate" />Candidate change · cần kiểm chứng</div>
-      <div className="key-row"><i className="legend-outline swatch-selected-scene" />Scene đang chọn</div>
-      <div className="key-row"><i className="legend-outline swatch-aoi" />AOI nghiên cứu</div>
+    <div className="layer-legend-stack map-overlay">
+      <CollapsibleLegend
+        open={mapLayersOpen}
+        title={isEnglish ? "Map layers" : "Lớp bản đồ"}
+        closeLabel={isEnglish ? "Collapse map layers" : "Thu gọn lớp bản đồ"}
+        openLabel={isEnglish ? "Map layers" : "Lớp bản đồ"}
+        onToggle={() => setMapLayersOpen((value) => !value)}
+      >
+        <LayerToggle checked={layers.mangrove} onChange={() => onToggle("mangrove")} swatch="legend-swatch swatch-mangrove">{isEnglish ? "Mangrove" : "Rừng ngập mặn"}</LayerToggle>
+        <LayerToggle checked={layers.anomalies} onChange={() => onToggle("anomalies")} swatch="legend-dot swatch-anomaly">{isEnglish ? "Anomalies" : "Bất thường"}</LayerToggle>
+        <LayerToggle checked={layers.aoi} onChange={() => onToggle("aoi")} swatch="legend-outline swatch-aoi">{isEnglish ? "Study AOI" : "AOI nghiên cứu"}</LayerToggle>
+        <LayerToggle checked={layers.sceneImage} onChange={() => onToggle("sceneImage")} swatch="legend-swatch swatch-radar">{isEnglish ? "NISAR radar image" : "Ảnh radar NISAR"}</LayerToggle>
+        <div className="radar-band-picker">
+          <button type="button" className={radarBand === "COMPOSITE" ? "active" : ""} onClick={() => onRadarBandChange("COMPOSITE")}>RGB</button>
+          <button type="button" className={radarBand === "HHHH" ? "active" : ""} onClick={() => onRadarBandChange("HHHH")}>HHHH</button>
+          <button type="button" className={radarBand === "HVHV" ? "active" : ""} onClick={() => onRadarBandChange("HVHV")}>HVHV</button>
+        </div>
+        <LayerToggle checked={layers.basemap} onChange={() => onToggle("basemap")} swatch="legend-swatch swatch-basemap">{isEnglish ? "Basemap" : "Bản đồ nền"}</LayerToggle>
+      </CollapsibleLegend>
+      <CollapsibleLegend
+        open={legendOpen}
+        title={isEnglish ? "Legend" : "Chú giải"}
+        closeLabel={isEnglish ? "Collapse legend" : "Thu gọn chú giải"}
+        openLabel={isEnglish ? "Legend" : "Chú giải"}
+        onToggle={() => setLegendOpen((value) => !value)}
+      >
+        <div className="key-row"><i className="legend-swatch swatch-mangrove" />{isEnglish ? "Mangrove" : "Rừng ngập mặn"}</div>
+        <div className="key-row"><i className="legend-swatch swatch-selected" />{isEnglish ? "Selected area" : "Khu vực đang chọn"}</div>
+        <div className="key-row"><i className="legend-swatch swatch-anomaly-area" />{isEnglish ? "Anomaly area" : "Vùng bất thường"}</div>
+        <div className="key-row"><i className="legend-dot swatch-anomaly" />{isEnglish ? "Anomaly point" : "Điểm bất thường"}</div>
+        <div className="key-row"><i className="legend-outline swatch-candidate" />{isEnglish ? "Candidate change · field verification required" : "Candidate change · cần kiểm chứng"}</div>
+        <div className="key-row"><i className="legend-outline swatch-selected-scene" />{isEnglish ? "Selected scene" : "Scene đang chọn"}</div>
+        <div className="key-row"><i className="legend-outline swatch-aoi" />{isEnglish ? "Study AOI" : "AOI nghiên cứu"}</div>
+      </CollapsibleLegend>
     </div>
   );
 }
@@ -1161,72 +1189,77 @@ function ScaleBar() {
   return <><div className="scale-bar map-overlay"><div><span /><span /><span /><span /></div><p><b>0</b><b>2,5</b><b>5 km</b></p></div><div className="map-brand">NASA GIBS · Earthdata</div></>;
 }
 
-function Inspector({ feature, radarMetric, pixelInspection, regionStats, comparison, open, onClose, onResizeStart }: { feature?: RegionFeature; radarMetric: RadarMetricState; pixelInspection: PixelInspection | null; regionStats: RegionStatsState; comparison: ComparisonState; open: boolean; onClose: () => void; onResizeStart: (side: "sidebar" | "inspector", event: ReactPointerEvent<HTMLButtonElement>) => void }) {
+function Inspector({ activeSection, language, layers, radarBand, onLayerChange, onRadarBandChange, onCloseLayers, feature, radarMetric, pixelInspection, regionStats, comparison, open, onClose, onResizeStart }: { activeSection: SidebarSection; language: ExplorerLanguage; layers: LayerState; radarBand: RadarBand; onLayerChange: (layer: string) => void; onRadarBandChange: (variable: RadarBand) => void; onCloseLayers: () => void; feature?: RegionFeature; radarMetric: RadarMetricState; pixelInspection: PixelInspection | null; regionStats: RegionStatsState; comparison: ComparisonState; open: boolean; onClose: () => void; onResizeStart: (side: "sidebar" | "inspector", event: ReactPointerEvent<HTMLButtonElement>) => void }) {
+  if (activeSection === "layers") {
+    return (
+      <aside className={`inspector layers-inspector ${open ? "mobile-open" : ""}`}>
+        <PanelResizeHandle language={language} side="inspector" onPointerDown={(event) => onResizeStart("inspector", event)} />
+        <DataLayersPanel language={language} layers={layers} radarBand={radarBand} onToggle={onLayerChange} onRadarBandChange={onRadarBandChange} onClose={onCloseLayers} />
+      </aside>
+    );
+  }
+
   return (
     <SceneInspector
       scene={feature ? { id: feature.properties.id, title: sceneDisplayTitle(feature.properties) } : undefined}
+      language={language}
       open={open}
       onClose={onClose}
       onResizeStart={(side, event) => onResizeStart(side, event)}
-      resizeHandle={<PanelResizeHandle side="inspector" onPointerDown={(event) => onResizeStart("inspector", event)} />}
-      closeButton={<button className="icon-button close-panel" aria-label="Đóng chi tiết" onClick={onClose}><Icon name="close" /></button>}
+      resizeHandle={<PanelResizeHandle language={language} side="inspector" onPointerDown={(event) => onResizeStart("inspector", event)} />}
+      closeButton={<button className="icon-button close-panel" aria-label={language === "en" ? "Close area details" : "Đóng chi tiết"} onClick={onClose}><Icon name="close" /></button>}
     >
-      {feature ? <RegionDetails feature={feature} radarMetric={radarMetric} pixelInspection={pixelInspection} regionStats={regionStats} comparison={comparison} /> : <div className="empty-detail">Chọn một vùng trên bản đồ để xem thông tin.</div>}
+      {feature ? <RegionDetails language={language} feature={feature} radarMetric={radarMetric} pixelInspection={pixelInspection} regionStats={regionStats} comparison={comparison} /> : <div className="empty-detail">{language === "en" ? "Select an area on the map to view its details." : "Chọn một vùng trên bản đồ để xem thông tin."}</div>}
     </SceneInspector>
   );
 }
 
-function PanelResizeHandle({ side, onPointerDown }: { side: "sidebar" | "inspector"; onPointerDown: (event: ReactPointerEvent<HTMLButtonElement>) => void }) {
-  return <button type="button" className={`panel-resize-handle ${side}`} aria-label={side === "sidebar" ? "Kéo để đổi độ rộng thanh bên trái" : "Kéo để đổi độ rộng bảng chi tiết"} onPointerDown={onPointerDown}><span aria-hidden="true" /></button>;
+function PanelResizeHandle({ language = "vi", side, onPointerDown }: { language?: ExplorerLanguage; side: "sidebar" | "inspector"; onPointerDown: (event: ReactPointerEvent<HTMLButtonElement>) => void }) {
+  const isEnglish = language === "en";
+  return <button type="button" className={`panel-resize-handle ${side}`} aria-label={side === "sidebar" ? (isEnglish ? "Resize left sidebar" : "Kéo để đổi độ rộng thanh bên trái") : (isEnglish ? "Resize details panel" : "Kéo để đổi độ rộng bảng chi tiết")} onPointerDown={onPointerDown}><span aria-hidden="true" /></button>;
 }
 
-function RegionDetails({ feature, radarMetric, pixelInspection, regionStats, comparison }: { feature: RegionFeature; radarMetric: RadarMetricState; pixelInspection: PixelInspection | null; regionStats: RegionStatsState; comparison: ComparisonState }) {
+function RegionDetails({ language, feature, radarMetric, pixelInspection, regionStats, comparison }: { language: ExplorerLanguage; feature: RegionFeature; radarMetric: RadarMetricState; pixelInspection: PixelInspection | null; regionStats: RegionStatsState; comparison: ComparisonState }) {
   const details = feature.properties;
   const isAnomaly = details.kind === "anomaly";
-  const label = details.kind === "mangrove" ? "Rừng ngập mặn" : isAnomaly ? "Vùng bất thường" : "Scene NISAR";
-  const status = isAnomaly ? "Bất thường" : details.kind === "study" ? "Đã đồng bộ" : "Ổn định";
+  const isEnglish = language === "en";
+  const label = details.kind === "mangrove" ? (isEnglish ? "Mangrove" : "Rừng ngập mặn") : isAnomaly ? (isEnglish ? "Anomaly area" : "Vùng bất thường") : "Scene NISAR";
   return (
     <div className="detail-content">
       <div className="selected-preview">
         <div className={`preview-shape ${isAnomaly ? "anomaly-preview" : ""}`}><span /></div>
         <div className="selected-preview-copy">
-          <span className="preview-eyebrow">{details.kind === "study" ? "NISAR · GCOV" : "KHU VỰC"}</span>
+          <span className="preview-eyebrow">{details.kind === "study" ? "NISAR · GCOV" : (isEnglish ? "AREA" : "KHU VỰC")}</span>
           <h2>{sceneDisplayTitle(details)}</h2>
           <p>{label}{details.kind === "study" ? ` · ${sceneShortId(details)}` : ""}</p>
         </div>
       </div>
 
       <div className="detail-grid">
-        <div><span>Vị trí</span><strong>{sceneDisplayTitle(details)}</strong><b>{details.kind === "study" ? "ASF DAAC · NISAR GCOV" : "Khu vực nghiên cứu"}</b></div>
-        <div><span>Diện tích</span><strong>{formatNumber(details.areaHa, " ha")}</strong></div>
-        <div><span>Độ tin cậy</span><strong className="accent">{details.confidence ? `${Math.round(details.confidence * 100)}%` : "—"}</strong></div>
+        {details.kind !== "study" && <div><span>{isEnglish ? "Location" : "Vị trí"}</span><strong>{sceneDisplayTitle(details)}</strong><b>{isEnglish ? "Study area" : "Khu vực nghiên cứu"}</b></div>}
+        <div><span>{isEnglish ? "Area" : "Diện tích"}</span><strong>{formatNumber(details.areaHa, " ha")}</strong></div>
+        <div><span>{isEnglish ? "Confidence" : "Độ tin cậy"}</span><strong className="accent">{details.confidence ? `${Math.round(details.confidence * 100)}%` : "—"}</strong></div>
       </div>
 
       {details.kind === "study" && (
         <div className="scene-meta">
-          <div><span>Thu nhận</span><strong>{formatSceneTimestamp(details.startTime)}</strong></div>
-          <div><span>Mã cảnh</span><strong>{sceneShortId(details)}</strong></div>
-          <div><span>Mức xử lý</span><strong>{details.processingLevel ?? "GCOV"}</strong></div>
+          <div><span>{isEnglish ? "Acquired" : "Thu nhận"}</span><strong>{formatSceneTimestamp(details.startTime, language)}</strong></div>
+          <div><span>{isEnglish ? "Scene ID" : "Mã cảnh"}</span><strong>{sceneShortId(details)}</strong></div>
+          <div><span>{isEnglish ? "Processing level" : "Mức xử lý"}</span><strong>{details.processingLevel ?? "GCOV"}</strong></div>
         </div>
       )}
 
-      <div className="detail-rule" />
-      <section className="status-section">
-        <div className="section-title"><h3>Tình trạng</h3><span className={`status-tag ${isAnomaly ? "danger" : "good"}`}>{status}</span></div>
-        <p>{details.description}</p>
-      </section>
-
-      <MetricSection title={`Tín hiệu radar${radarMetric.metric?.series && Object.keys(radarMetric.metric.series).length > 1 ? " · HH/HV" : radarMetric.variable ? ` · ${radarMetric.variable}` : ""}`} value={radarMetric.status === "loading" ? "Đang đọc…" : radarMetric.metric ? `${radarMetric.metric.meanDb.toFixed(1)} dB` : "Chưa có dữ liệu"}>
-        <RadarSparkline metric={radarMetric.metric} status={radarMetric.status} />
+      <MetricSection title={`${isEnglish ? "Radar signal" : "Tín hiệu radar"}${radarMetric.metric?.series && Object.keys(radarMetric.metric.series).length > 1 ? " · HH/HV" : radarMetric.variable ? ` · ${radarMetric.variable}` : ""}`} value={radarMetric.status === "loading" ? (isEnglish ? "Reading…" : "Đang đọc…") : radarMetric.metric ? `${radarMetric.metric.meanDb.toFixed(1)} dB` : (isEnglish ? "No data" : "Chưa có dữ liệu")}>
+        <RadarSparkline language={language} metric={radarMetric.metric} status={radarMetric.status} />
       </MetricSection>
-      {pixelInspection && <section className="pixel-inspection"><div className="metric-title"><h3>Pixel đang xem</h3><span>{pixelInspection.coordinate.longitude.toFixed(5)}, {pixelInspection.coordinate.latitude.toFixed(5)}</span></div><div className="pixel-values">{Object.entries(pixelInspection.values).map(([band, value]) => <div key={band}><span>{band}</span><b>{value.valid && value.db !== null ? `${value.db.toFixed(2)} dB` : "Không có dữ liệu"}</b></div>)}</div><small>Mask: {pixelInspection.mask.valid ? "hợp lệ" : "nodata"} · {pixelInspection.source}</small></section>}
-      {regionStats.status !== "idle" && <section className="region-stats"><div className="metric-title"><h3>Thống kê trong AOI</h3><span>{regionStats.status === "loading" ? "Đang tính…" : regionStats.status === "error" ? "Không đọc được" : "GeoTIFF cache"}</span></div>{regionStats.statistics && Object.entries(regionStats.statistics).map(([band, stats]) => <div className="stats-band" key={band}><b>{band}</b><span>Coverage {stats.validCoveragePercent.toFixed(1)}%</span><span>Median {(stats.medianDb ?? 0).toFixed(2)} dB</span><span>Diện tích hợp lệ {(stats.validAreaHa ?? 0).toFixed(2)} ha</span><span>P10/P90 {(stats.p10Db ?? 0).toFixed(1)} / {(stats.p90Db ?? 0).toFixed(1)} dB</span><div className="stats-histogram" aria-label={`Histogram ${band}`}>{(stats.histogram?.counts ?? []).map((count, index) => <i key={`${band}-${index}`} style={{ height: `${Math.max(4, Math.min(100, count / Math.max(...(stats.histogram?.counts ?? [1])) * 100))}%` }} />)}</div></div>)}</section>}
-      {comparison.status === "ready" && <section className="candidate-note"><b>Candidate change</b><p>Vùng vượt ngưỡng sàng lọc 3 dB. Đây chưa phải kết luận mất rừng hay bất thường đã xác nhận.</p></section>}
-      <MetricSection title="Mực triều" value={details.tideM ? `Hiện tại: ${details.tideM} m` : "Chưa có dữ liệu"} className="tide-section">
-        <TideSparkline />
+      {pixelInspection && <section className="pixel-inspection"><div className="metric-title"><h3>{isEnglish ? "Selected pixel" : "Pixel đang xem"}</h3><span>{pixelInspection.coordinate.longitude.toFixed(5)}, {pixelInspection.coordinate.latitude.toFixed(5)}</span></div><div className="pixel-values">{Object.entries(pixelInspection.values).map(([band, value]) => <div key={band}><span>{band}</span><b>{value.valid && value.db !== null ? `${value.db.toFixed(2)} dB` : (isEnglish ? "No data" : "Không có dữ liệu")}</b></div>)}</div><small>Mask: {pixelInspection.mask.valid ? (isEnglish ? "valid" : "hợp lệ") : "nodata"} · {pixelInspection.source}</small></section>}
+      {regionStats.status !== "idle" && <section className="region-stats"><div className="metric-title"><h3>{isEnglish ? "AOI statistics" : "Thống kê trong AOI"}</h3><span>{regionStats.status === "loading" ? (isEnglish ? "Calculating…" : "Đang tính…") : regionStats.status === "error" ? (isEnglish ? "Could not read" : "Không đọc được") : "GeoTIFF cache"}</span></div>{regionStats.statistics && Object.entries(regionStats.statistics).map(([band, stats]) => <div className="stats-band" key={band}><b>{band}</b><span>Coverage {stats.validCoveragePercent.toFixed(1)}%</span><span>Median {(stats.medianDb ?? 0).toFixed(2)} dB</span><span>{isEnglish ? "Valid area" : "Diện tích hợp lệ"} {(stats.validAreaHa ?? 0).toFixed(2)} ha</span><span>P10/P90 {(stats.p10Db ?? 0).toFixed(1)} / {(stats.p90Db ?? 0).toFixed(1)} dB</span><div className="stats-histogram" aria-label={`Histogram ${band}`}>{(stats.histogram?.counts ?? []).map((count, index) => <i key={`${band}-${index}`} style={{ height: `${Math.max(4, Math.min(100, count / Math.max(...(stats.histogram?.counts ?? [1])) * 100))}%` }} />)}</div></div>)}</section>}
+      {comparison.status === "ready" && <section className="candidate-note"><b>Candidate change</b><p>{isEnglish ? "This area exceeds the 3 dB screening threshold. It is not a confirmed deforestation or anomaly finding." : "Vùng vượt ngưỡng sàng lọc 3 dB. Đây chưa phải kết luận mất rừng hay bất thường đã xác nhận."}</p></section>}
+      <MetricSection title={isEnglish ? "Tide level" : "Mực triều"} value={details.tideM ? (isEnglish ? `Current: ${details.tideM} m` : `Hiện tại: ${details.tideM} m`) : (isEnglish ? "No data" : "Chưa có dữ liệu")} className="tide-section">
+        <TideSparkline language={language} />
       </MetricSection>
 
-      <button className="field-action"><Icon name="focus" size={16} /> Mở phiếu kiểm tra thực địa <span>↗</span></button>
+      <button className="field-action"><Icon name="focus" size={16} /> {isEnglish ? "Open field verification form" : "Mở phiếu kiểm tra thực địa"} <span>↗</span></button>
     </div>
   );
 }
@@ -1240,8 +1273,9 @@ function MetricSection({ title, value, className = "", children }: { title: stri
   );
 }
 
-function RadarSparkline({ metric, status }: { metric?: RadarMetric; status: RadarMetricState["status"] }) {
-  if (!metric?.values.length) return <div className="chart-empty">{status === "loading" ? "Đang đọc giá trị thật từ GCOV…" : "Chưa có chuỗi số liệu radar cho scene này."}</div>;
+function RadarSparkline({ language, metric, status }: { language: ExplorerLanguage; metric?: RadarMetric; status: RadarMetricState["status"] }) {
+  const isEnglish = language === "en";
+  if (!metric?.values.length) return <div className="chart-empty">{status === "loading" ? (isEnglish ? "Reading measured values from GCOV…" : "Đang đọc giá trị thật từ GCOV…") : (isEnglish ? "No radar data series is available for this scene." : "Chưa có chuỗi số liệu radar cho scene này.")}</div>;
   const series = metric.series && Object.values(metric.series).filter((item): item is RadarSeries => Boolean(item?.values.length));
   const plottedSeries = series && series.length > 1 ? series : [{ variable: metric.variable, values: metric.values, meanDb: metric.meanDb } as RadarSeries];
   const allValues = plottedSeries.flatMap((item) => item.values);
@@ -1261,11 +1295,11 @@ function RadarSparkline({ metric, status }: { metric?: RadarMetric; status: Rada
     <div className="radar-chart-card">
       <div className="radar-chart-caption">
         <span>{plottedSeries.length > 1 ? "HH/HV profile · dB" : `Backscatter ${metric.variable}`}</span>
-        <span>{plottedSeries.map((item) => `${item.variable}: ${item.values.length}`).join(" · ")} cột ảnh</span>
+        <span>{plottedSeries.map((item) => `${item.variable}: ${item.values.length}`).join(" · ")} {isEnglish ? "image columns" : "cột ảnh"}</span>
       </div>
       <div className="radar-plot-shell">
         <div className="radar-y-labels" aria-hidden="true"><span>{maximum.toFixed(1)}</span><span>{(maximum - range / 2).toFixed(1)}</span><span>{minimum.toFixed(1)}</span></div>
-        <svg className="sparkline radar-chart" viewBox="0 0 360 136" preserveAspectRatio="none" role="img" aria-label={`Biểu đồ backscatter ${metric.variable} theo vị trí trong ảnh`}>
+        <svg className="sparkline radar-chart" viewBox="0 0 360 136" preserveAspectRatio="none" role="img" aria-label={isEnglish ? `Backscatter ${metric.variable} by image position` : `Biểu đồ backscatter ${metric.variable} theo vị trí trong ảnh`}>
           <defs><linearGradient id="radar-area-gradient" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stopColor="#0b9d91" stopOpacity=".22" /><stop offset="100%" stopColor="#0b9d91" stopOpacity=".02" /></linearGradient></defs>
           <path className="spark-grid" d="M12 15H348M12 68H348M12 121H348M12 15V121M96 15V121M180 15V121M264 15V121M348 15V121" />
           {plottedSeries.map((item, index) => {
@@ -1275,17 +1309,16 @@ function RadarSparkline({ metric, status }: { metric?: RadarMetric; status: Rada
           })}
         </svg>
       </div>
-      <div className="radar-axis-labels"><span>Vị trí tương đối trong ảnh · 0%</span><span>100%</span></div>
+      <div className="radar-axis-labels"><span>{isEnglish ? "Relative image position · 0%" : "Vị trí tương đối trong ảnh · 0%"}</span><span>100%</span></div>
       <div className="radar-stats"><span>P10 <b>{(plottedSeries[0].p10Db ?? minimum).toFixed(1)} dB</b></span><span>Median <b>{(plottedSeries[0].medianDb ?? plottedSeries[0].meanDb).toFixed(1)} dB</b></span><span>P90 <b>{(plottedSeries[0].p90Db ?? maximum).toFixed(1)} dB</b></span></div>
       {plottedSeries.length > 1 && <div className="radar-series-legend"><span><i className="series-dot hh" /> HHHH</span><span><i className="series-dot hv" /> HVHV</span></div>}
-      <p className="chart-note">Mỗi điểm là trung bình theo một cột ảnh. Giá trị phân tích lấy từ GeoTIFF cache; RGB chỉ là cách hiển thị, không phải một band mới.</p>
     </div>
   );
 }
 
-function TideSparkline() {
+function TideSparkline({ language }: { language: ExplorerLanguage }) {
   return (
-    <svg className="sparkline tide-chart" viewBox="0 0 340 118" preserveAspectRatio="none" aria-label="Biểu đồ mực triều">
+    <svg className="sparkline tide-chart" viewBox="0 0 340 118" preserveAspectRatio="none" aria-label={language === "en" ? "Tide level chart" : "Biểu đồ mực triều"}>
       <path className="spark-grid" d="M0 18H340M0 50H340M0 82H340M0 114H340M0 18V114M85 18V114M170 18V114M255 18V114M340 18V114" />
       <path className="tide-area" d="M0 78 C42 24 82 24 126 68 S214 105 256 64 S314 28 340 40 V118 H0 Z" />
       <path className="tide-path" d="M0 78 C42 24 82 24 126 68 S214 105 256 64 S314 28 340 40" />

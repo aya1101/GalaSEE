@@ -6,6 +6,13 @@ out/
 coverage/
 .cache/
 *.log
+*.log.*
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.eslintcache
+.turbo/
 .env
 .env.*
 !.env.example
@@ -18,6 +25,7 @@ venv/
 dist/
 build/
 .DS_Store
+Thumbs.db
 
 # Local agent/dev session state
 .history/

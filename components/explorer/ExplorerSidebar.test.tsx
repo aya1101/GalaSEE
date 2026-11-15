@@ -1,12 +1,11 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { ExplorerSidebar } from "./ExplorerSidebar";
 
-describe("ExplorerSidebar data truth", () => {
-  it("labels upstream errors without presenting demo values", () => {
+describe("ExplorerSidebar", () => {
+  it("keeps upstream status details out of the navigation rail", () => {
     render(
       <ExplorerSidebar
-        scene={{ id: "scene-1", title: "Cần Giờ", dataMode: "error", assetMode: "unavailable", dataStatus: "error" }}
         layerState={{}}
         onLayerChange={vi.fn()}
         activeSection="map"
@@ -15,7 +14,44 @@ describe("ExplorerSidebar data truth", () => {
       />,
     );
 
-    expect(screen.getByText("Nguồn dữ liệu lỗi")).toBeInTheDocument();
-    expect(screen.queryByText("Dữ liệu mô phỏng")).not.toBeInTheDocument();
+    expect(screen.queryByText("Nguồn dữ liệu lỗi")).not.toBeInTheDocument();
+    expect(screen.queryByText("Cần Giờ")).not.toBeInTheDocument();
+  });
+
+  it("switches the explorer navigation to English", () => {
+    render(
+      <ExplorerSidebar
+        language="en"
+        layerState={{}}
+        onLayerChange={vi.fn()}
+        activeSection="map"
+        onSectionChange={vi.fn()}
+        onResizeStart={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("Map")).toBeInTheDocument();
+    expect(screen.getByText("Data layers")).toBeInTheDocument();
+    expect(screen.getByText("Study area")).toBeInTheDocument();
+    expect(screen.queryByText("Earthdata live")).not.toBeInTheDocument();
+  });
+
+  it("returns to the scene inspector from the study area tab", () => {
+    const onSectionChange = vi.fn();
+    const onStudyAreaFocus = vi.fn();
+    render(
+      <ExplorerSidebar
+        layerState={{}}
+        onLayerChange={vi.fn()}
+        activeSection="layers"
+        onSectionChange={onSectionChange}
+        onStudyAreaFocus={onStudyAreaFocus}
+        onResizeStart={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByText("Khu vực nghiên cứu"));
+    expect(onSectionChange).toHaveBeenCalledWith("map");
+    expect(onStudyAreaFocus).toHaveBeenCalledOnce();
   });
 });
