@@ -14,6 +14,8 @@ import { LayerPanel } from "@/components/explorer/LayerPanel";
 import { SceneInspector } from "@/components/explorer/SceneInspector";
 import { TimelineControl } from "@/components/explorer/TimelineControl";
 import { CollapsibleLegend } from "@/components/explorer/CollapsibleLegend";
+import { TideAwareRunPanel } from "@/components/explorer/TideAwareRunPanel";
+import { TIDEAWARE_BUNDLE_TRACKS } from "@/components/explorer/tideaware-bundle";
 import chatbotLogo from "@/chatbot-logo.png";
 import type { CopilotAnalyticsSnapshot, CopilotContext, UiAction } from "@/components/copilot/copilot-types";
 
@@ -21,7 +23,7 @@ maplibregl.setWorkerUrl(new URL("maplibre-gl/dist/maplibre-gl-worker.mjs", impor
 
 type RegionFeature = Feature<Geometry, RegionProperties>;
 type RadarBand = "COMPOSITE" | "HHHH" | "HVHV";
-type SidebarSection = "map" | "layers";
+type SidebarSection = "map" | "layers" | "engine";
 type RadarSeries = { variable: "HHHH" | "HVHV"; values: number[]; meanDb: number; medianDb?: number; p10Db?: number; p90Db?: number; validPixelCount?: number };
 type RadarMetric = { values: number[]; meanDb: number; variable: "HHHH" | "HVHV"; series?: Partial<Record<"HHHH" | "HVHV", RadarSeries>>; source?: string };
 type RadarMetricState = { status: "idle" | "loading" | "ready" | "error"; metric?: RadarMetric; variable?: "HHHH" | "HVHV" };
@@ -44,6 +46,8 @@ type AssetMode = "live" | "cached" | "unavailable";
 type DataStatus = "ready" | "partial" | "unknown" | "error";
 type DataTruth = { catalogMode: CatalogMode; assetMode: AssetMode; dataStatus: DataStatus };
 type ExplorerLanguage = "en" | "vi";
+type TideObservation = { timestamp: string; levelM: number };
+type TidePlotState = { status: "idle" | "loading" | "ready" | "error"; observations: TideObservation[]; targetLevelM?: number | null };
 
 const gcovPreviewCache = new Map<string, Promise<PreviewAsset>>();
 
@@ -59,6 +63,10 @@ function contextVersionFor(value: unknown): number {
 
 function analyticsUrl(path: string) {
   return apiBaseUrl ? `${apiBaseUrl}/api/v1/${path}` : `/api/earthdata/analytics/${path}`;
+}
+
+function tideAwareUrl(path: string) {
+  return apiBaseUrl ? `${apiBaseUrl}/api/v1/tideaware/${path}` : `/api/earthdata/tideaware/${path}`;
 }
 
 async function postAnalytics<T>(path: string, body: unknown): Promise<T> {
@@ -483,6 +491,7 @@ export function ExplorerShell({ region }: ExplorerShellProps) {
   const [comparison, setComparison] = useState<ComparisonState>({ status: "idle" });
   const [pixelInspection, setPixelInspection] = useState<PixelInspection | null>(null);
   const [regionStats, setRegionStats] = useState<RegionStatsState>({ status: "idle" });
+  const [tideAwareCandidates, setTideAwareCandidates] = useState<FeatureCollection<Geometry, Record<string, unknown>> | null>(null);
   const [activeSection, setActiveSection] = useState<SidebarSection>("map");
   const [language, setLanguage] = useState<ExplorerLanguage>("vi");
   const [copilotOpen, setCopilotOpen] = useState(false);
@@ -576,6 +585,7 @@ export function ExplorerShell({ region }: ExplorerShellProps) {
       map.addLayer({ id: "aoi-line", type: "line", source: "aoi", paint: { "line-color": "#f4b23b", "line-width": 2.2, "line-opacity": 0.95 } });
       map.addSource("regions", { type: "geojson", data: demoGeoJson, promoteId: "id" });
       map.addSource("candidate-change", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
+      map.addSource("tideaware-candidates", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
       map.addLayer({ id: "selected-scene-line", type: "line", source: "regions", filter: ["all", ["==", ["get", "kind"], "study"], ["==", ["get", "id"], selectedIdRef.current]], paint: { "line-color": "#ef5b4a", "line-width": 2.7, "line-opacity": 0.98 } });
       map.addLayer({ id: "mangrove-fill", type: "fill", source: "regions", filter: ["==", ["get", "kind"], "mangrove"], paint: { "fill-color": ["case", ["boolean", ["feature-state", "selected"], false], "#f4b23b", "#0cb6a7"], "fill-opacity": ["case", ["boolean", ["feature-state", "selected"], false], 0.58, 0.3] } });
       map.addLayer({ id: "mangrove-line", type: "line", source: "regions", filter: ["==", ["get", "kind"], "mangrove"], paint: { "line-color": ["case", ["boolean", ["feature-state", "selected"], false], "#ffd36b", "#26d6c7"], "line-width": ["case", ["boolean", ["feature-state", "selected"], false], 2.3, 1.1], "line-opacity": 0.92 } });
@@ -584,6 +594,10 @@ export function ExplorerShell({ region }: ExplorerShellProps) {
       map.addLayer({ id: "anomaly-points", type: "circle", source: "regions", filter: ["==", ["get", "kind"], "anomaly"], paint: { "circle-color": "#ef6b5b", "circle-radius": 5, "circle-stroke-color": "#ffc6bc", "circle-stroke-width": 1.5 } });
       map.addLayer({ id: "candidate-change-fill", type: "fill", source: "candidate-change", paint: { "fill-color": "#ed7f57", "fill-opacity": 0.25 } });
       map.addLayer({ id: "candidate-change-line", type: "line", source: "candidate-change", paint: { "line-color": "#d84f38", "line-width": 2.3, "line-dasharray": [2, 1] } });
+      map.addLayer({ id: "tideaware-candidate-fill", type: "fill", source: "tideaware-candidates", paint: { "fill-color": "#c98a1a", "fill-opacity": 0.22 } });
+      map.addLayer({ id: "tideaware-candidate-line", type: "line", source: "tideaware-candidates", paint: { "line-color": "#a96c09", "line-width": 2.1, "line-dasharray": [1, 1] } });
+      map.setLayoutProperty("tideaware-candidate-fill", "visibility", "none");
+      map.setLayoutProperty("tideaware-candidate-line", "visibility", "none");
       map.setLayoutProperty("candidate-change-fill", "visibility", "none");
       map.setLayoutProperty("candidate-change-line", "visibility", "none");
       applyLayerVisibility(map, layersRef.current);
@@ -691,6 +705,16 @@ export function ExplorerShell({ region }: ExplorerShellProps) {
   }, [layers]);
 
   useEffect(() => {
+    const map = mapRef.current;
+    const source = map?.getSource("tideaware-candidates") as maplibregl.GeoJSONSource | undefined;
+    if (!map || !source) return;
+    source.setData(tideAwareCandidates ?? { type: "FeatureCollection", features: [] });
+    const visibility = tideAwareCandidates?.features.length ? "visible" : "none";
+    if (map.getLayer("tideaware-candidate-fill")) map.setLayoutProperty("tideaware-candidate-fill", "visibility", visibility);
+    if (map.getLayer("tideaware-candidate-line")) map.setLayoutProperty("tideaware-candidate-line", "visibility", visibility);
+  }, [tideAwareCandidates]);
+
+  useEffect(() => {
     setComparison({ status: "idle" });
     const map = mapRef.current;
     if (map?.getLayer("candidate-change-fill")) map.setLayoutProperty("candidate-change-fill", "visibility", "none");
@@ -764,15 +788,6 @@ export function ExplorerShell({ region }: ExplorerShellProps) {
   };
 
   const toggleLayer = (key: keyof typeof layers) => setLayers((current) => ({ ...current, [key]: !current[key] }));
-  const focusStudyArea = () => {
-    setActiveSection("map");
-    const map = mapRef.current;
-    const bounds = featureBounds(studyAreaGeoJson.features[0]);
-    if (!map || !bounds) return;
-    const fit = () => map.fitBounds(bounds, { padding: { top: 88, right: 72, bottom: 72, left: 72 }, duration: 600, maxZoom: 11.5 });
-    if (map.isStyleLoaded()) fit();
-    else map.once("load", fit);
-  };
   const rememberUndo = () => {
     const snapshot = { selectedId, layers, radarBand, activeSection, mobilePanelOpen };
     undoStackRef.current = [...undoStackRef.current, snapshot].slice(-20);
@@ -922,7 +937,6 @@ export function ExplorerShell({ region }: ExplorerShellProps) {
           onLayerChange={(layer) => toggleLayer(layer as keyof LayerState)}
           activeSection={activeSection}
           onSectionChange={setActiveSection}
-          onStudyAreaFocus={focusStudyArea}
           onResizeStart={startResize}
         />
         <ExplorerMap
@@ -943,7 +957,7 @@ export function ExplorerShell({ region }: ExplorerShellProps) {
           </LayerPanel>
           <ScaleBar />
         </ExplorerMap>
-        <Inspector activeSection={activeSection} language={language} layers={layers} radarBand={radarBand} onLayerChange={(layer) => toggleLayer(layer as keyof LayerState)} onRadarBandChange={setRadarBand} onCloseLayers={() => setActiveSection("map")} feature={selectedFeature} radarMetric={radarMetric} pixelInspection={pixelInspection} regionStats={regionStats} comparison={comparison} open={mobilePanelOpen} onClose={() => setMobilePanelOpen(false)} onResizeStart={startResize} />
+        <Inspector activeSection={activeSection} language={language} layers={layers} radarBand={radarBand} onLayerChange={(layer) => toggleLayer(layer as keyof LayerState)} onRadarBandChange={setRadarBand} onCloseLayers={() => setActiveSection("map")} feature={selectedFeature} radarMetric={radarMetric} pixelInspection={pixelInspection} regionStats={regionStats} comparison={comparison} open={mobilePanelOpen} onClose={() => { setMobilePanelOpen(false); setActiveSection("map"); }} onResizeStart={startResize} onTideAwareCandidatesChange={setTideAwareCandidates} />
         <button className="mobile-panel-trigger" onClick={() => setMobilePanelOpen(true)}><Icon name="menu" /> {language === "en" ? "Area details" : "Chi tiết khu vực"}</button>
         <div className="copilot-dock" style={copilotDockPosition ? { left: copilotDockPosition.left, top: copilotDockPosition.top, right: "auto", bottom: "auto" } : undefined}>
           <button type="button" className="copilot-bubble" aria-label={language === "en" ? "Open GalaSEE Assistant" : "Mở GalaSEE Assistant"} onPointerDown={startCopilotDrag} onClick={() => setCopilotOpen(true)}><Image src={chatbotLogo} alt="" aria-hidden="true" priority /></button>
@@ -1189,12 +1203,25 @@ function ScaleBar() {
   return <><div className="scale-bar map-overlay"><div><span /><span /><span /><span /></div><p><b>0</b><b>2,5</b><b>5 km</b></p></div><div className="map-brand">NASA GIBS · Earthdata</div></>;
 }
 
-function Inspector({ activeSection, language, layers, radarBand, onLayerChange, onRadarBandChange, onCloseLayers, feature, radarMetric, pixelInspection, regionStats, comparison, open, onClose, onResizeStart }: { activeSection: SidebarSection; language: ExplorerLanguage; layers: LayerState; radarBand: RadarBand; onLayerChange: (layer: string) => void; onRadarBandChange: (variable: RadarBand) => void; onCloseLayers: () => void; feature?: RegionFeature; radarMetric: RadarMetricState; pixelInspection: PixelInspection | null; regionStats: RegionStatsState; comparison: ComparisonState; open: boolean; onClose: () => void; onResizeStart: (side: "sidebar" | "inspector", event: ReactPointerEvent<HTMLButtonElement>) => void }) {
+function Inspector({ activeSection, language, layers, radarBand, onLayerChange, onRadarBandChange, onCloseLayers, feature, radarMetric, pixelInspection, regionStats, comparison, open, onClose, onResizeStart, onTideAwareCandidatesChange }: { activeSection: SidebarSection; language: ExplorerLanguage; layers: LayerState; radarBand: RadarBand; onLayerChange: (layer: string) => void; onRadarBandChange: (variable: RadarBand) => void; onCloseLayers: () => void; feature?: RegionFeature; radarMetric: RadarMetricState; pixelInspection: PixelInspection | null; regionStats: RegionStatsState; comparison: ComparisonState; open: boolean; onClose: () => void; onResizeStart: (side: "sidebar" | "inspector", event: ReactPointerEvent<HTMLButtonElement>) => void; onTideAwareCandidatesChange: (value: FeatureCollection<Geometry, Record<string, unknown>> | null) => void }) {
   if (activeSection === "layers") {
     return (
       <aside className={`inspector layers-inspector ${open ? "mobile-open" : ""}`}>
         <PanelResizeHandle language={language} side="inspector" onPointerDown={(event) => onResizeStart("inspector", event)} />
         <DataLayersPanel language={language} layers={layers} radarBand={radarBand} onToggle={onLayerChange} onRadarBandChange={onRadarBandChange} onClose={onCloseLayers} />
+      </aside>
+    );
+  }
+
+  if (activeSection === "engine") {
+    return (
+      <aside className={`inspector tideaware-inspector ${open ? "mobile-open" : ""}`}>
+        <PanelResizeHandle language={language} side="inspector" onPointerDown={(event) => onResizeStart("inspector", event)} />
+        <div className="inspector-head">
+          <div><span className="panel-kicker">TIDE-AWARE ENGINE</span><h1>{language === "en" ? "Tide-aware analysis" : "Phân tích theo triều"}</h1></div>
+          <button className="icon-button close-panel" aria-label={language === "en" ? "Close analysis" : "Đóng phân tích"} onClick={() => onClose()}><Icon name="close" /></button>
+        </div>
+        <TideAwareRunPanel language={language} aoi={studyAreaGeoJson.features[0].geometry as unknown as Record<string, unknown>} autoStart detail onCandidatesChange={onTideAwareCandidatesChange} />
       </aside>
     );
   }
@@ -1223,6 +1250,28 @@ function RegionDetails({ language, feature, radarMetric, pixelInspection, region
   const details = feature.properties;
   const isAnomaly = details.kind === "anomaly";
   const isEnglish = language === "en";
+  const [tidePlot, setTidePlot] = useState<TidePlotState>({ status: "idle", observations: [] });
+  const detailIdentity = [details.id, details.fileName, details.sceneName, details.collectionId].filter(Boolean).join(" ");
+  const bundleTrack = TIDEAWARE_BUNDLE_TRACKS.find((track) => detailIdentity.includes(track.track));
+  const bundlePlot = useMemo(() => bundleTrack ? {
+    status: "ready" as const,
+    observations: bundleTrack.points.filter((point): point is typeof point & { levelM: number } => point.levelM !== null).map((point) => ({ timestamp: `${point.date}T00:00:00Z`, levelM: point.levelM })),
+    targetLevelM: details.startTime ? bundleTrack.points.find((point) => point.date === details.startTime?.slice(0, 10))?.levelM ?? null : null,
+  } : null, [bundleTrack, details.startTime]);
+
+  useEffect(() => {
+    let active = true;
+    setTidePlot(bundlePlot ?? { status: "loading", observations: [] });
+    const endpoint = details.startTime ? `tide?center=${encodeURIComponent(details.startTime)}&hours=72` : "tide?hours=72";
+    fetch(tideAwareUrl(endpoint), { cache: "no-store" })
+      .then(async (response) => {
+        const payload = await response.json() as { observations?: TideObservation[]; targetLevelM?: number | null };
+        if (!response.ok) throw new Error("Tide request failed");
+        if (active) setTidePlot(payload.observations?.length ? { status: "ready", observations: payload.observations, targetLevelM: payload.targetLevelM } : bundlePlot ?? { status: "ready", observations: [], targetLevelM: null });
+      })
+      .catch(() => { if (active) setTidePlot(bundlePlot ?? { status: "error", observations: [] }); });
+    return () => { active = false; };
+  }, [bundlePlot, details.id, details.startTime]);
   const label = details.kind === "mangrove" ? (isEnglish ? "Mangrove" : "Rừng ngập mặn") : isAnomaly ? (isEnglish ? "Anomaly area" : "Vùng bất thường") : "Scene NISAR";
   return (
     <div className="detail-content">
@@ -1255,8 +1304,8 @@ function RegionDetails({ language, feature, radarMetric, pixelInspection, region
       {pixelInspection && <section className="pixel-inspection"><div className="metric-title"><h3>{isEnglish ? "Selected pixel" : "Pixel đang xem"}</h3><span>{pixelInspection.coordinate.longitude.toFixed(5)}, {pixelInspection.coordinate.latitude.toFixed(5)}</span></div><div className="pixel-values">{Object.entries(pixelInspection.values).map(([band, value]) => <div key={band}><span>{band}</span><b>{value.valid && value.db !== null ? `${value.db.toFixed(2)} dB` : (isEnglish ? "No data" : "Không có dữ liệu")}</b></div>)}</div><small>Mask: {pixelInspection.mask.valid ? (isEnglish ? "valid" : "hợp lệ") : "nodata"} · {pixelInspection.source}</small></section>}
       {regionStats.status !== "idle" && <section className="region-stats"><div className="metric-title"><h3>{isEnglish ? "AOI statistics" : "Thống kê trong AOI"}</h3><span>{regionStats.status === "loading" ? (isEnglish ? "Calculating…" : "Đang tính…") : regionStats.status === "error" ? (isEnglish ? "Could not read" : "Không đọc được") : "GeoTIFF cache"}</span></div>{regionStats.statistics && Object.entries(regionStats.statistics).map(([band, stats]) => <div className="stats-band" key={band}><b>{band}</b><span>Coverage {stats.validCoveragePercent.toFixed(1)}%</span><span>Median {(stats.medianDb ?? 0).toFixed(2)} dB</span><span>{isEnglish ? "Valid area" : "Diện tích hợp lệ"} {(stats.validAreaHa ?? 0).toFixed(2)} ha</span><span>P10/P90 {(stats.p10Db ?? 0).toFixed(1)} / {(stats.p90Db ?? 0).toFixed(1)} dB</span><div className="stats-histogram" aria-label={`Histogram ${band}`}>{(stats.histogram?.counts ?? []).map((count, index) => <i key={`${band}-${index}`} style={{ height: `${Math.max(4, Math.min(100, count / Math.max(...(stats.histogram?.counts ?? [1])) * 100))}%` }} />)}</div></div>)}</section>}
       {comparison.status === "ready" && <section className="candidate-note"><b>Candidate change</b><p>{isEnglish ? "This area exceeds the 3 dB screening threshold. It is not a confirmed deforestation or anomaly finding." : "Vùng vượt ngưỡng sàng lọc 3 dB. Đây chưa phải kết luận mất rừng hay bất thường đã xác nhận."}</p></section>}
-      <MetricSection title={isEnglish ? "Tide level" : "Mực triều"} value={details.tideM ? (isEnglish ? `Current: ${details.tideM} m` : `Hiện tại: ${details.tideM} m`) : (isEnglish ? "No data" : "Chưa có dữ liệu")} className="tide-section">
-        <TideSparkline language={language} />
+      <MetricSection title={isEnglish ? "Tide level" : "Mực triều"} value={details.tideM ? (isEnglish ? `Current: ${details.tideM} m` : `Hiện tại: ${details.tideM} m`) : tidePlot.targetLevelM !== null && tidePlot.targetLevelM !== undefined ? (isEnglish ? `Scene: ${tidePlot.targetLevelM.toFixed(2)} m` : `Scene: ${tidePlot.targetLevelM.toFixed(2)} m`) : tidePlot.status === "loading" ? (isEnglish ? "Loading…" : "Đang tải…") : (isEnglish ? "No data" : "Chưa có dữ liệu")} className="tide-section">
+        <TideSparkline language={language} plot={tidePlot} />
       </MetricSection>
 
       <button className="field-action"><Icon name="focus" size={16} /> {isEnglish ? "Open field verification form" : "Mở phiếu kiểm tra thực địa"} <span>↗</span></button>
@@ -1316,14 +1365,40 @@ function RadarSparkline({ language, metric, status }: { language: ExplorerLangua
   );
 }
 
-function TideSparkline({ language }: { language: ExplorerLanguage }) {
+function TideSparkline({ language, plot }: { language: ExplorerLanguage; plot: TidePlotState }) {
+  const isEnglish = language === "en";
+  if (plot.status === "loading") return <div className="chart-empty">{isEnglish ? "Loading UHSLC tide observations…" : "Đang tải dữ liệu triều UHSLC…"}</div>;
+  if (!plot.observations.length) return <div className="chart-empty">{plot.status === "error" ? (isEnglish ? "Tide source unavailable." : "Nguồn dữ liệu triều không khả dụng.") : (isEnglish ? "No tide observations around this scene." : "Chưa có quan trắc triều quanh scene này.")}</div>;
+  const width = 340;
+  const top = 18;
+  const height = 96;
+  const values = plot.observations.map((item) => item.levelM);
+  const minimum = Math.min(...values);
+  const maximum = Math.max(...values);
+  const range = maximum - minimum || 0.1;
+  const point = (item: TideObservation, index: number) => {
+    const x = (index / Math.max(plot.observations.length - 1, 1)) * width;
+    const y = top + ((maximum - item.levelM) / range) * height;
+    return [x, y] as const;
+  };
+  const path = plot.observations.map((item, index) => {
+    const [x, y] = point(item, index);
+    return `${index === 0 ? "M" : "L"}${x.toFixed(1)} ${y.toFixed(1)}`;
+  }).join(" ");
+  const selectedIndex = plot.targetLevelM === null || plot.targetLevelM === undefined ? plot.observations.length - 1 : plot.observations.reduce((best, item, index) => Math.abs(item.levelM - plot.targetLevelM!) < Math.abs(plot.observations[best].levelM - plot.targetLevelM!) ? index : best, 0);
+  const [selectedX, selectedY] = point(plot.observations[selectedIndex], selectedIndex);
   return (
-    <svg className="sparkline tide-chart" viewBox="0 0 340 118" preserveAspectRatio="none" aria-label={language === "en" ? "Tide level chart" : "Biểu đồ mực triều"}>
-      <path className="spark-grid" d="M0 18H340M0 50H340M0 82H340M0 114H340M0 18V114M85 18V114M170 18V114M255 18V114M340 18V114" />
-      <path className="tide-area" d="M0 78 C42 24 82 24 126 68 S214 105 256 64 S314 28 340 40 V118 H0 Z" />
-      <path className="tide-path" d="M0 78 C42 24 82 24 126 68 S214 105 256 64 S314 28 340 40" />
-      <circle cx="340" cy="40" r="5" className="tide-point" />
-    </svg>
+    <div className="tide-chart-card">
+      <div className="tide-chart-caption"><span>UHSLC · {plot.observations.length} obs.</span><span>{minimum.toFixed(2)}–{maximum.toFixed(2)} m</span></div>
+      <svg className="sparkline tide-chart" viewBox="0 0 340 118" preserveAspectRatio="none" role="img" aria-label={isEnglish ? "Observed tide level chart" : "Biểu đồ mực triều quan trắc thực tế"}>
+        <path className="spark-grid" d="M0 18H340M0 50H340M0 82H340M0 114H340M0 18V114M85 18V114M170 18V114M255 18V114M340 18V114" />
+        <path className="tide-area" d={`${path} L340 118 L0 118 Z`} />
+        <path className="tide-path" d={path} />
+        <line className="tide-scene-line" x1={selectedX} x2={selectedX} y1="18" y2="114" />
+        <circle cx={selectedX} cy={selectedY} r="5" className="tide-point" />
+      </svg>
+      <div className="tide-axis-labels"><span>{isEnglish ? "Low" : "Thấp"} {minimum.toFixed(2)} m</span><span>{isEnglish ? "Scene" : "Scene"}</span><span>{isEnglish ? "High" : "Cao"} {maximum.toFixed(2)} m</span></div>
+    </div>
   );
 }
 

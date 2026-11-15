@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { serverApiUrl } from "@/lib/server-api";
 
 export const dynamic = "force-dynamic";
 
@@ -9,7 +10,7 @@ export async function GET(request: Request) {
   const variable = params.get("variable") ?? "HHHH";
   const frequency = params.get("frequency") ?? "auto";
   if (!scene) return NextResponse.json({ error: "Missing scene" }, { status: 400 });
-  const apiUrl = process.env.EARTHDATA_API_URL?.replace(/\/$/, "");
+  const apiUrl = serverApiUrl();
   if (!apiUrl) return NextResponse.json({ error: "Earthdata API is not configured" }, { status: 503 });
   try {
     const response = await fetch(`${apiUrl}/api/v1/earthdata/gcov?scene=${encodeURIComponent(scene)}&collection=${encodeURIComponent(collection)}&variable=${encodeURIComponent(variable)}&frequency=${encodeURIComponent(frequency)}`, { cache: "no-store" });

@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 
@@ -16,12 +16,30 @@ const EarthGlobe = dynamic(
   }
 );
 
+const FLIGHT_FALLBACK_MS = 4600;
+
 export default function Home() {
   const router = useRouter();
 
   const [isRegionOpen, setIsRegionOpen] = useState(false);
   const [flyToRegion, setFlyToRegion] = useState(false);
   const [selectedRegion, setSelectedRegion] = useState("");
+  const navigationTimerRef = useRef<number | null>(null);
+  const navigationStartedRef = useRef(false);
+
+  const navigateToExplorer = useCallback((region: string) => {
+    if (!region || navigationStartedRef.current) return;
+    navigationStartedRef.current = true;
+    if (navigationTimerRef.current !== null) {
+      window.clearTimeout(navigationTimerRef.current);
+      navigationTimerRef.current = null;
+    }
+    router.push(`/explorer?region=${encodeURIComponent(region)}`);
+  }, [router]);
+
+  useEffect(() => () => {
+    if (navigationTimerRef.current !== null) window.clearTimeout(navigationTimerRef.current);
+  }, []);
 
   // Click Earth -> open region selector
   const handleEarthClick = useCallback(() => {
@@ -38,16 +56,15 @@ export default function Home() {
     setIsRegionOpen(false);
     setSelectedRegion(region);
     setFlyToRegion(true);
-  }, []);
+    navigationTimerRef.current = window.setTimeout(() => navigateToExplorer(region), FLIGHT_FALLBACK_MS);
+  }, [navigateToExplorer]);
 
   // Camera animation completed -> open Explorer
   const handleFlightComplete = useCallback(() => {
     if (!selectedRegion) return;
 
-    router.push(
-      `/explorer?region=${encodeURIComponent(selectedRegion)}`
-    );
-  }, [router, selectedRegion]);
+    navigateToExplorer(selectedRegion);
+  }, [navigateToExplorer, selectedRegion]);
 
   return (
     <main

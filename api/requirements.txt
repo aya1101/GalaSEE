@@ -3,6 +3,7 @@ uvicorn[standard]
 httpx
 python-dotenv
 numpy
+scipy
 rasterio
 shapely
 pyproj
