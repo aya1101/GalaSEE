@@ -36,11 +36,11 @@ export default function LandingHero() {
         <span
           style={{
             color: "#8095a5",
-            fontSize: "11px",
+            fontSize: "15px",
             letterSpacing: "2px",
           }}
         >
-          NASA SPACE APPS CHALLENGE 2026
+          NASA Space Apps Challenge Hà Nội 2026
         </span>
       </header>
 
@@ -60,7 +60,8 @@ export default function LandingHero() {
             fontSize: "12px",
             letterSpacing: "3px",
             fontWeight: 500,
-            marginBottom: "32px",
+            marginBottom: "5px",
+            marginTop: "50px",
           }}
         >
           NASA SPACE APPS CHALLENGE 2026
@@ -69,7 +70,7 @@ export default function LandingHero() {
         <h1
           style={{
             fontSize: "clamp(52px, 5.8vw, 100px)",
-            fontWeight: 300,
+            fontWeight: 800,
             letterSpacing: "-4px",
             lineHeight: 1.05,
             margin: 0,
@@ -82,7 +83,7 @@ export default function LandingHero() {
 
         <p
           style={{
-            marginTop: "32px",
+            marginTop: "10px",
             color: "#91a7b6",
             fontSize: "12px",
             letterSpacing: "2.5px",
@@ -96,8 +97,8 @@ export default function LandingHero() {
             width: "58px",
             height: "1px",
             background: "#64d2da",
-            marginTop: "40px",
-            marginBottom: "40px",
+            marginTop: "10px",
+            
           }}
         />
 
@@ -106,7 +107,7 @@ export default function LandingHero() {
             fontSize: "22px",
             fontWeight: 400,
             color: "#f1f5f9",
-            marginBottom: "22px",
+            marginBottom: "10px",
           }}
         >
           Not every change is what it seems.
@@ -128,18 +129,29 @@ export default function LandingHero() {
 
         <div
           style={{
-            marginTop: "48px",
+            marginTop: "10px",
             display: "flex",
             alignItems: "center",
-            gap: "14px",
-            color: "#67dce3",
-            fontSize: "12px",
-            letterSpacing: "2px",
           }}
         >
-          <span style={{ fontSize: "24px" }}>◎</span>
-          CLICK THE EARTH TO EXPLORE
-          <span>↗</span>
+          <div
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "4px",
+              backgroundColor: "#b83026",
+              color: "#FFFFFF",
+              padding: "15px 24px",
+              borderRadius: "40px",
+              fontSize: "13px",
+              fontWeight: 800,
+              letterSpacing: "0.8px",
+              boxShadow: "0 4px 20px rgba(224, 60, 49, 0.18)",
+            }}
+          >
+            CLICK THE EARTH TO EXPLORE
+          </div>
         </div>
       </section>
 
@@ -179,7 +191,7 @@ export default function LandingHero() {
       >
         <span>GALASEE © 2026</span>
 
-        <span>DUONG · TRANG · NGOC</span>
+        <span>DUONG · NGOC · TRANG</span>
 
         <span
           style={{
