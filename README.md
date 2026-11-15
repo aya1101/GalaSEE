@@ -85,6 +85,16 @@ python -m uvicorn api.main:app --port 8000
 
 If port `8000` already has a healthy TideAware API, the development launcher reuses it. Stop the old process when you need to load a different environment or dependency set.
 
+### Sharing the frontend with ngrok
+
+Expose the Next.js port, not the API port:
+
+```bash
+ngrok http 3000
+```
+
+The Next.js config allows `*.ngrok-free.dev` and `*.ngrok.io` for development-only assets. This is required by Next.js 16 so client-only features such as the 3D globe can hydrate through the tunnel. Production builds do not use this dev-origin allowlist.
+
 ## Environment configuration
 
 Start with `.env.example`. The most important values are:
