@@ -544,7 +544,7 @@
   width: 300px;
   height: auto;
   object-fit: contain;
-  transform: translateY(20px);
+  transform: translateY(10px);
 }
 
 @media (max-width: 768px) {
