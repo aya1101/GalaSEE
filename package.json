@@ -9,7 +9,7 @@
     "dev": "concurrently --names web,api --prefix-colors cyan,green \"npm run dev:web\" \"npm run dev:api\"",
     "dev:web": "next dev --hostname 127.0.0.1",
     "dev:api": "node scripts/dev-api.mjs",
-    "prebuild": "rimraf .next-build",
+    "prebuild": "rimraf .next",
     "build": "next build --webpack",
     "start": "next start",
     "typecheck": "tsc --noEmit",
