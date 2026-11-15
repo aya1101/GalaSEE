@@ -30,7 +30,19 @@ from .tideaware.routes import router as tideaware_router
 
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
-GCOV_CACHE_DIR = Path(os.getenv("GCOV_CACHE_DIR", Path(__file__).resolve().parent.parent / ".cache" / "gcov"))
+REPOSITORY_ROOT = Path(__file__).resolve().parent.parent
+
+
+def default_gcov_cache_dir() -> Path:
+    configured = os.getenv("GCOV_CACHE_DIR", "").strip()
+    if configured:
+        return Path(configured)
+    if os.getenv("VERCEL"):
+        return Path(os.getenv("TMPDIR", "/tmp")) / "tideaware" / "gcov"
+    return REPOSITORY_ROOT / ".cache" / "gcov"
+
+
+GCOV_CACHE_DIR = default_gcov_cache_dir()
 GCOV_CACHE_DIR.mkdir(parents=True, exist_ok=True)
 GCOV_CACHE_INDEX = GCOV_CACHE_DIR / "index.json"
 GCOV_INSPECTION_DIR = GCOV_CACHE_DIR / "inspection"
