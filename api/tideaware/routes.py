@@ -7,18 +7,12 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
-import numpy as np
-import rasterio
 from fastapi import APIRouter
 from fastapi.responses import FileResponse, JSONResponse
 from .contracts import TideAwareRunRequest
-from .deterministic_engine import run_track_analysis
 from .jobs import SAFE_ID, read_run_state, run_state_path, write_run_state
-from .live_assets import AssetCompatibilityError, ensure_live_scene_assets, read_common_stack
 from .live_scenes import SceneCompatibilityError, filter_scene_records, select_scene_roles
 from .live_tide import DEFAULT_UHSLC_URL, evaluate_tide_coverage, fetch_uhslc_hourly, interpolate_tide, tide_window
-from .pipeline import build_track_summary
-from .report import build_report_payload, render_report_html
 
 
 router = APIRouter(prefix="/api/v1/tideaware", tags=["tideaware"])
@@ -83,6 +77,13 @@ async def _run_tideaware(run_id: str, request: TideAwareRunRequest) -> None:
     _write_state(run_id, state)
     try:
         from .. import main
+        import numpy as np
+        import rasterio
+
+        from .deterministic_engine import run_track_analysis
+        from .live_assets import AssetCompatibilityError, ensure_live_scene_assets, read_common_stack
+        from .pipeline import build_track_summary
+        from .report import build_report_payload, render_report_html
 
         records = await main.earthdata_scene_catalog()
         if not records:

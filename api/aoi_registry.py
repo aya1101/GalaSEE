@@ -2,9 +2,6 @@ import hashlib
 import json
 from typing import Any
 
-from shapely.geometry import shape
-
-
 def canonical_geojson(value: dict[str, Any]) -> str:
     return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
 
@@ -19,9 +16,15 @@ class AoiRegistry:
         self._values: dict[tuple[str, str], dict[str, Any]] = {}
 
     def register(self, session_id: str, geometry: dict[str, Any], aoi_id: str = "aoi-study") -> tuple[str, str]:
+        from shapely.geometry import shape
+
         candidate = shape(geometry)
         if candidate.geom_type != "Polygon" or not candidate.is_valid or candidate.is_empty:
             raise ValueError("AOI must be a valid non-empty Polygon")
+        return self.register_trusted(session_id, geometry, aoi_id)
+
+    def register_trusted(self, session_id: str, geometry: dict[str, Any], aoi_id: str = "aoi-study") -> tuple[str, str]:
+        """Register application-owned geometry without loading Shapely."""
         digest = aoi_hash(geometry)
         self._values[(session_id, aoi_id)] = geometry
         return aoi_id, digest

@@ -16,17 +16,60 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
-from shapely.geometry import shape
-
-from .gcov_analytics import AnalyticsError, compare_rasters, raster_metadata, raster_profile, region_statistics, sample_pixel
-from .gcov_preview import render_preview_png
 from .copilot_models import CatalogResult
 from .copilot_context import build_map_context, build_scene_truth
 from .aoi_registry import AoiRegistry
 from .copilot import CopilotRequest, CopilotService
 from .copilot_tools import ToolContext
 from .default_aoi import DEFAULT_AOI_GEOMETRY, DEFAULT_AOI_ID
-from .tideaware.routes import router as tideaware_router
+
+
+# Keep the API entrypoint importable in a constrained serverless runtime. The
+# geospatial stack is only needed by analysis/preview requests, not for health,
+# metadata, or the tide proxy.
+AnalyticsError = RuntimeError
+
+
+def shape(value):
+    from shapely.geometry import shape as shapely_shape
+
+    return shapely_shape(value)
+
+
+def compare_rasters(*args, **kwargs):
+    from .gcov_analytics import compare_rasters as implementation
+
+    return implementation(*args, **kwargs)
+
+
+def raster_metadata(*args, **kwargs):
+    from .gcov_analytics import raster_metadata as implementation
+
+    return implementation(*args, **kwargs)
+
+
+def raster_profile(*args, **kwargs):
+    from .gcov_analytics import raster_profile as implementation
+
+    return implementation(*args, **kwargs)
+
+
+def region_statistics(*args, **kwargs):
+    from .gcov_analytics import region_statistics as implementation
+
+    return implementation(*args, **kwargs)
+
+
+def sample_pixel(*args, **kwargs):
+    from .gcov_analytics import sample_pixel as implementation
+
+    return implementation(*args, **kwargs)
+
+
+def render_preview_png(*args, **kwargs):
+    from .gcov_preview import render_preview_png as implementation
+
+    return implementation(*args, **kwargs)
 
 
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
@@ -60,8 +103,17 @@ def default_gcov_cache_dir() -> Path:
     return REPOSITORY_ROOT / ".cache" / "gcov"
 
 
-GCOV_CACHE_DIR = default_gcov_cache_dir()
-GCOV_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+def ensure_writable_cache_dir(candidate: Path) -> Path:
+    try:
+        candidate.mkdir(parents=True, exist_ok=True)
+        return candidate
+    except OSError:
+        fallback = runtime_temp_root() / "tideaware" / "gcov"
+        fallback.mkdir(parents=True, exist_ok=True)
+        return fallback
+
+
+GCOV_CACHE_DIR = ensure_writable_cache_dir(default_gcov_cache_dir())
 GCOV_CACHE_INDEX = GCOV_CACHE_DIR / "index.json"
 GCOV_INSPECTION_DIR = GCOV_CACHE_DIR / "inspection"
 GCOV_INSPECTION_DIR.mkdir(parents=True, exist_ok=True)
@@ -70,14 +122,13 @@ GCOV_COLLECTION_PATH_RE = re.compile(r"^/science/LSAR/GCOV/grids/(?P<frequency>f
 ANALYTICS_CACHE_DIR = GCOV_CACHE_DIR / "analytics"
 COMPARISON_DIR = ANALYTICS_CACHE_DIR / "comparisons"
 PREVIEW_DIR = ANALYTICS_CACHE_DIR / "previews"
-ANALYTICS_CACHE_DIR.mkdir(parents=True, exist_ok=True)
-COMPARISON_DIR.mkdir(parents=True, exist_ok=True)
-PREVIEW_DIR.mkdir(parents=True, exist_ok=True)
+for cache_dir in (GCOV_INSPECTION_DIR, ANALYTICS_CACHE_DIR, COMPARISON_DIR, PREVIEW_DIR):
+    cache_dir.mkdir(parents=True, exist_ok=True)
 COMPARISON_TASKS: dict[str, asyncio.Task] = {}
 GCOV_INFLIGHT: dict[str, asyncio.Task] = {}
 COPILOT_AOIS = AoiRegistry()
-COPILOT_AOIS.register("default", DEFAULT_AOI_GEOMETRY, DEFAULT_AOI_ID)
-COPILOT_AOIS.register("browser-session", DEFAULT_AOI_GEOMETRY, DEFAULT_AOI_ID)
+COPILOT_AOIS.register_trusted("default", DEFAULT_AOI_GEOMETRY, DEFAULT_AOI_ID)
+COPILOT_AOIS.register_trusted("browser-session", DEFAULT_AOI_GEOMETRY, DEFAULT_AOI_ID)
 COPILOT_SERVICE = CopilotService()
 
 
@@ -1411,5 +1462,7 @@ COPILOT_SERVICE.tools.register("search_scenes", _copilot_search_scenes)
 COPILOT_SERVICE.tools.register("get_radar_profile", _copilot_profile)
 COPILOT_SERVICE.tools.register("get_region_stats", _copilot_region_stats)
 COPILOT_SERVICE.tools.register("get_pixel_values", _copilot_pixel)
+
+from .tideaware.routes import router as tideaware_router
 
 app.include_router(tideaware_router)
